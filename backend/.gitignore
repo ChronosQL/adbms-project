@@ -1,0 +1,51 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Output
+dist/
+build/
+tmp/
+temp/
+
+# Logs
+logs/
+*.log
+
+# OS/Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Runtime files
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Database files
+*.sqlite
+*.sqlite3
+db/*.sqlite
+db/*.db
+
+# Misc
+.cache/
+.parcel-cache/
+/.next/
+*.swp

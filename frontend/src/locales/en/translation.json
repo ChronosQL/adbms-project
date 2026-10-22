@@ -1,0 +1,928 @@
+{
+  "nav": {
+    "home": "Home",
+    "tourBooking": "Tour Booking",
+    "pointToPoint": "Point-to-Point",
+    "packageTours": "Package Tours",
+    "customizedTours": "Customized Tours",
+    "vehicleCategory": "Vehicle Category",
+    "reviews": "Reviews",
+    "aboutUs": "About Us",
+    "contactUs": "Contact Us",
+    "gallery": "Gallery",
+    "adminDashboard": "Admin Dashboard",
+    "myProfile": "My Profile",
+    "logout": "Logout",
+    "login": "Login"
+  },
+  "footer": {
+    "discover": "Discover",
+    "clientSupport": "Client Support",
+    "getInTouch": "Get In Touch",
+    "quote": "Explore the paradise island with unmatched elegance. From luxury sedans to rugged SUVs, we move your dreams.",
+    "links": {
+      "home": "Home",
+      "vehicleCategory": "Vehicle Category",
+      "tourPackages": "Tour Packages",
+      "gallery": "Gallery",
+      "reviews": "Reviews",
+      "aboutUs": "About Us",
+      "contactUs": "Contact Us",
+      "privacyPolicy": "Privacy Policy",
+      "termsOfService": "Terms of Service",
+      "faq": "FAQ"
+    },
+    "sltda": "SLTDA Registered Agency",
+    "copyright": "© {{year}} Ceylon Best Tours. Created by TechNova Team."
+  },
+  "home": {
+    "hero": {
+      "ceylon": "Ceylon",
+      "bestTours": "Best Tours",
+      "desc": "Explore the paradise island with unmatched elegance. From luxury sedans to rugged SUVs, we move your dreams.",
+      "bookRide": "BOOK YOUR RIDE",
+      "exploreFleet": "EXPLORE FLEET",
+      "luxuryVehicles": "Luxury Vehicles",
+      "islandSupport": "Island Support",
+      "liveAvailability": "Live Availability"
+    },
+    "whyUs": {
+      "goldStandard": "The Gold Standard",
+      "our": "Our",
+      "signature": "Signature",
+      "amenities": "Amenities.",
+      "allInclusiveFleet": "All-Inclusive Fleet",
+      "services": {
+        "connected": "Connected",
+        "freeWifi": "Free Wi-Fi",
+        "convenience": "Convenience",
+        "tollsParking": "Tolls & Parking",
+        "refreshment": "Refreshment",
+        "freeWater": "Free Water",
+        "security": "Security",
+        "gpsTracking": "GPS Tracking",
+        "planning": "Planning",
+        "itinerarySupport": "Itinerary Support",
+        "professional": "Professional",
+        "expertDriver": "Expert Driver",
+        "transparent": "Transparent",
+        "fuelIncluded": "Fuel Included",
+        "protected": "Protected",
+        "passengerInsurance": "Passenger Insurance",
+        "hospitality": "Hospitality",
+        "driverHousing": "Driver Housing",
+        "prepared": "Prepared",
+        "umbrella": "Umbrella"
+      }
+    },
+    "destinations": {
+      "exploreSriLanka": "Explore Sri Lanka",
+      "popularDestinations": "Popular Destinations",
+      "badges": {
+        "misty": "Misty",
+        "surfing": "Surfing",
+        "ancient": "Ancient",
+        "hiking": "Hiking",
+        "heritage": "Heritage",
+        "diving": "Diving"
+      },
+      "locations": {
+        "hillCountry": "Hill Country",
+        "southCoast": "South Coast",
+        "culturalTriangle": "Cultural Triangle",
+        "badulla": "Badulla",
+        "galle": "Galle",
+        "eastCoast": "East Coast"
+      },
+      "titles": {
+        "nuwaraEliya": "Nuwara Eliya",
+        "mirissa": "Mirissa",
+        "sigiriya": "Sigiriya",
+        "ella": "Ella",
+        "galleFort": "Galle Fort",
+        "trincomalee": "Trincomalee"
+      }
+    },
+    "reviews": {
+      "whatOur": "What Our",
+      "customers": "Customers",
+      "say": "Say",
+      "trustedReviews": "Trusted Reviews",
+      "seeMoreReviews": "SEE MORE REVIEWS"
+    }
+  },
+  "auth": {
+    "login": {
+      "journeyBegins": "Your Journey Begins Here",
+      "heroDesc": "Experience the pinnacle of travel with Ceylon Best Tours' premium fleet and bespoke tours.",
+      "welcomeBack": "Welcome Back",
+      "enterDetails": "Please enter your details to sign in.",
+      "emailAddress": "Email address",
+      "password": "Password",
+      "forgotPassword": "Forgot password?",
+      "rememberMe": "Remember me for 30 days",
+      "signIn": "Sign In",
+      "signingIn": "Signing in...",
+      "noAccount": "Don't have an account?",
+      "signUpFree": "Sign up for free",
+      "invalidEmail": "Invalid email or password. Please try again."
+    },
+    "register": {
+      "joinAdventure": "Join the Adventure",
+      "heroDesc": "Create an account to unlock exclusive tours and premium vehicle rentals.",
+      "createAccount": "Create Account",
+      "signUpStart": "Sign up to get started with Ceylone Best Tours.",
+      "fullName": "Full Name",
+      "emailAddress": "Email address",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "agreeTo": "I agree to the",
+      "termsOfService": "Terms of Service",
+      "and": "and",
+      "privacyPolicy": "Privacy Policy",
+      "creatingAccount": "Creating account...",
+      "alreadyHaveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "passwordsDontMatch": "Passwords don't match. Please try again.",
+      "passwordTooShort": "Password must be at least 6 characters.",
+      "registrationFailed": "Registration failed. Please try again."
+    }
+  },
+  "about": {
+    "stats": {
+      "yearsExperience": "Years Experience",
+      "happyTravelers": "Happy Travelers",
+      "luxuryVehicles": "Luxury Vehicles",
+      "expertGuides": "Expert Guides"
+    },
+    "features": {
+      "premiumQuality": "Premium Quality",
+      "premiumQualityDesc": "We offer only the highest standard of vehicles and services to ensure your comfort.",
+      "bespokeItineraries": "Bespoke Itineraries",
+      "bespokeItinerariesDesc": "Custom-tailored tours designed to match your unique interests and preferences.",
+      "safeSecure": "Safe & Secure",
+      "safeSecureDesc": "Your safety is our priority. All our vehicles are well-maintained and insured.",
+      "support247": "24/7 Support",
+      "support247Desc": "Round-the-clock customer service to assist you at any point during your journey."
+    },
+    "hero": {
+      "discover": "Discover Sri Lanka",
+      "inLuxury": "In Ultimate Luxury",
+      "desc": "We are more than just a travel agency. We are your premium gateway to the wonders of Ceylon, dedicated to crafting unforgettable journeys."
+    },
+    "story": {
+      "subtitle": "Our Story",
+      "title": "A Legacy of Excellence in Travel",
+      "p1": "Founded over a decade ago, Ceylone Best Tours started with a simple vision: to showcase the breathtaking beauty of Sri Lanka while providing unparalleled comfort and luxury to every traveler.",
+      "p2": "Today, we stand as a premier travel and transport provider. Our dedicated team of professionals, expert chauffeurs, and a fleet of top-tier vehicles ensure that your journey through our island is nothing short of perfection.",
+      "btn": "Explore Our Fleet"
+    },
+    "whyChoose": {
+      "subtitle": "The Ceylone Best Tours Difference",
+      "title": "Why Travel With Us?",
+      "desc": "We go above and beyond to deliver an extraordinary travel experience, combining authentic local knowledge with international standards of service."
+    }
+  },
+  "contact": {
+    "header": {
+      "help": "We're Here to Help",
+      "contact": "Contact",
+      "us": "Us.",
+      "desc": "Have questions or need assistance? Reach out through any of the channels below."
+    },
+    "form": {
+      "successTitle": "Message Sent Successfully!",
+      "successDescAuth": "Thank you for contacting Ceylon Best Tours. We've received your message and will respond within 6 hours. You can check replies in your dashboard.",
+      "successDescGuest": "Thank you for contacting Ceylon Best Tours. We've received your message and will respond within 6 hours. We'll send our response to your email.",
+      "returnHome": "Return to Home",
+      "viewInbox": "View Inbox",
+      "sendUsMessage": "Send Us a Message",
+      "name": "Name *",
+      "email": "Email Address *",
+      "phone": "Phone Number",
+      "subject": "Subject *",
+      "selectSubject": "Select a subject",
+      "subjects": {
+        "general": "General Inquiry",
+        "booking": "Booking Question",
+        "vehicle": "Vehicle Rental",
+        "tour": "Tour Package",
+        "feedback": "Feedback",
+        "support": "Support"
+      },
+      "message": "Message *",
+      "messagePlaceholder": "Tell us how we can help you...",
+      "sendMessage": "Send Message"
+    },
+    "faq": {
+      "badge": "FAQ",
+      "title": "Frequently Asked Questions",
+      "q1": "Is insurance included in the quoted price?",
+      "a1": "Yes, all our tours have foreign passenger insurance included in the price.",
+      "q2": "Can I pick up the car at the airport?",
+      "a2": "Absolutely yes! Just let us know your flight details.",
+      "q3": "What happens if you face an accident while travelling?",
+      "a3": "After reporting the insurance, if the vehicle is suitable for the journey will continue the tour with the same vehicle. If necessary, the vehicle will be replaced with another same range of the vehicle as soon as possible.",
+      "q4": "What are the excludes from the quoted price?",
+      "a4": "You'll need to pay for any services like entrance tickets, food and beverages, accommodation."
+    },
+    "info": {
+      "badge": "Contact",
+      "getInTouch": "Get in Touch",
+      "ourLocation": "Our Location",
+      "locationLine1": "No.214, Kirinda Hospital Road,",
+      "locationLine2": "Kirinda, Tissamaharama, Sri Lanka.",
+      "phone": "Phone",
+      "whatsapp": "WhatsApp",
+      "email": "Email",
+      "businessHours": "Business Hours",
+      "hours": "24/7 Monday - Sunday",
+      "emergency": "Emergency Assistance",
+      "emergencyDesc": "24/7 roadside assistance for all our customers.",
+      "followUs": "Follow Us"
+    }
+  },
+  "gallery": {
+    "header": {
+      "badge": "Tour Gallery",
+      "title": "Captured Moments",
+      "desc": "Browse through incredible experiences shared by our travelers exploring the wonders of Sri Lanka"
+    },
+    "filters": {
+      "searchPlaceholder": "Search by location, traveler, or keyword...",
+      "filtersBtn": "Filters",
+      "allSeasons": "All Seasons",
+      "allVibes": "All Vibes",
+      "allLocations": "All Locations",
+      "ourCustomers": "Our Customers",
+      "customersMobile": "Customers",
+      "activeFilters": "Active filters:",
+      "clearAll": "Clear all"
+    },
+    "results": {
+      "loadingBackend": "Loading gallery from the backend...",
+      "showing": "Showing",
+      "tourExperiences": "tour experiences",
+      "loadingTitle": "Loading gallery",
+      "loadingDesc": "Fetching live gallery items from the backend.",
+      "noPhotos": "No photos found",
+      "noPhotosDesc": "Try adjusting your search criteria or clearing some filters to see more results.",
+      "clearAllBtn": "Clear All Filters"
+    },
+    "card": {
+      "featured": "Featured"
+    },
+    "cta": {
+      "title": "Ready for an adventure?",
+      "desc": "Tailor-made luxury tours designed just for you.",
+      "btn": "Get a Custom Quote"
+    }
+  },
+  "reviews": {
+    "hero": {
+      "badge": "Amazing Traveller Experiences",
+      "title1": "Guest",
+      "title2": "Reviews.",
+      "desc": "Real stories from real travellers who explored Sri Lanka with us.",
+      "note": "✦ Reviews are available only after your tour is marked complete by our team.",
+      "writeBtn": "Write a Review",
+      "loginBtn": "Log In to Write a Review"
+    },
+    "stats": {
+      "summary": "Average rating",
+      "basedOn": "Based on",
+      "travelers": "travelers",
+      "total": "total reviews",
+      "s1": "one star reviews",
+      "s2": "two star reviews",
+      "s3": "three star reviews",
+      "s4": "four star reviews",
+      "s5": "five star reviews"
+    },
+    "grid": {
+      "stars": "Stars",
+      "bookingType": "Booking Type",
+      "all": "All",
+      "reviews": "reviews",
+      "sortNewest": "Newest First",
+      "sortHighest": "Highest Rated",
+      "sortLowest": "Lowest Rated",
+      "emptyTitle": "No reviews found",
+      "emptySub": "Try adjusting your filters.",
+      "types": {
+        "package": "Package Tour",
+        "custom": "Customised Tours",
+        "p2p": "Point to Point Tours"
+      }
+    },
+    "card": {
+      "driver": "Driver:",
+      "seeMore": "See More →",
+      "seeLess": "← See Less"
+    },
+    "modal": {
+      "loginTitle": "Log in to write a review",
+      "loginSub": "Share your Sri Lanka experience with fellow travellers. Sign in to get started.",
+      "note1": "✦ Note:",
+      "note2": "Reviews are only available once our team marks your tour status as",
+      "note3": "Completed",
+      "note4": ". You will be notified when you can leave a review.",
+      "loginBtn": "Log In",
+      "createBtn": "Create Account",
+      "tag": "✦ Share Your Experience",
+      "writeTitle": "Write a Review",
+      "reqTitle": "Login Required"
+    },
+    "form": {
+      "labels": {
+        "poor": "Poor",
+        "fair": "Fair",
+        "good": "Good",
+        "veryGood": "Very Good",
+        "excellent": "Excellent"
+      },
+      "noToursTitle": "No completed tours yet",
+      "noToursSub1": "Reviews become available once our team marks your tour as",
+      "noToursSub2": "Completed",
+      "noToursSub3": ". Check back after your journey ends!",
+      "closeBtn": "Close",
+      "successTitle": "Thank you for your review!",
+      "successSub1": "Your review has been published and can be found on the reviews page and in",
+      "successSub2": "My Reviews",
+      "successSub3": "in your dashboard.",
+      "doneBtn": "Done",
+      "fields": {
+        "tour": "Your Completed Tour",
+        "completed": "Completed",
+        "loading": "Loading tour information...",
+        "rating": "Overall Rating",
+        "tapToRate": "Tap a star to rate",
+        "driver": "Driver Name",
+        "driverPlaceholder": "Type your driver's name (optional)",
+        "title": "Review Title",
+        "titlePlaceholder": "Summarise your experience in a sentence…",
+        "comment": "Your Review",
+        "commentPlaceholder": "Tell others about your experience — what made it special, what you loved, what surprised you…",
+        "photos": "Photos (up to",
+        "addPhoto": "Add Photo",
+        "photosAdded": "photos added"
+      },
+      "actions": {
+        "submitting": "Submitting...",
+        "submit": "Submit Review",
+        "clear": "Clear"
+      },
+      "errors": {
+        "tour": "Please select a tour.",
+        "stars": "Please give a star rating.",
+        "title": "Please add a review title.",
+        "comment": "Comment must be at least 20 characters."
+      }
+    }
+  },
+  "tours": {
+    "intro": {
+      "slides": [
+        {
+          "tag": "Premium Travel Services",
+          "headlineWhite": "Discover",
+          "headlineTeal": "Sri Lanka.",
+          "sub": "Curated journeys across the pearl of the Indian Ocean.",
+          "labels": ["Package Tours", "Customized Tours", "Point to Point"]
+        },
+        {
+          "tag": "Package Tours",
+          "headlineWhite": "Golden",
+          "headlineTeal": "Triangle.",
+          "sub": "Ancient temples, misty highlands & sun-drenched shores — curated journeys through Sri Lanka's most iconic destinations."
+        },
+        {
+          "tag": "Customized Tours",
+          "headlineWhite": "Your Perfect",
+          "headlineTeal": "Journey.",
+          "sub": "Tell us your dream — we craft a bespoke itinerary with hidden gems, private experiences & expert local guides."
+        },
+        {
+          "tag": "Point to Point",
+          "headlineWhite": "Seamless",
+          "headlineTeal": "Transfers.",
+          "sub": "Premium air-conditioned vehicles and professional drivers ensure you arrive at every destination in comfort."
+        }
+      ]
+    },
+    "package": {
+      "badge": "Tour Packages",
+      "stats": [
+        ["12+", "Packages"],
+        ["5★", "Top Rated"],
+        ["100%", "Guided"]
+      ],
+      "eyebrow": "Handpicked Journeys",
+      "title1": "Tour",
+      "title2": "Packages.",
+      "desc": "Choose from our expertly crafted itineraries. From the Hill Country mist to the Golden Beaches, our fixed packages offer the best value with a dedicated driver.",
+      "steps": ["Pick a Package", "Set Dates", "Start Itinerary"],
+      "btn": "Explore Packages"
+    },
+    "custom": {
+      "badge": "Fully Custom",
+      "stats": [
+        ["500+", "Happy Customers"],
+        ["10+", "Years Exp"],
+        ["100%", "Bespoke"]
+      ],
+      "eyebrow": "Bespoke Experience",
+      "title1": "Customized",
+      "title2": "Tours.",
+      "desc": "Your journey, your rules. Select your favourite stops, your preferred vehicle category, and let us handle the logistics. Freedom is the ultimate luxury.",
+      "steps": ["Your Plans", "Pick Vehicle", "We Handle It"],
+      "btn": "Design Your Tour"
+    },
+    "point": {
+      "badge": "One Directional",
+      "stats": [
+        ["24/7", "Available"],
+        ["50+", "Destinations"],
+        ["4.9★", "Rated"]
+      ],
+      "eyebrow": "Seamless Transfers",
+      "title1": "Point to",
+      "title2": "Point.",
+      "desc": "Reliable transfers between any two locations in Sri Lanka. Professional drivers and air-conditioned vehicles waiting just for you.",
+      "steps": ["Set Locations", "Instant Bookings", "We Drive You"],
+      "btn": "Book a Transfer"
+    }
+  },
+  "packageTours": {
+    "hero": {
+      "tag": "Handpicked Journeys",
+      "title1": "Package",
+      "title2": "Tours.",
+      "sub": "Discover the soul of Sri Lanka with our curated travel experiences. From misty mountains to golden beaches."
+    },
+    "filters": {
+      "typeLabel": "Type",
+      "durationLabel": "Duration",
+      "allDurations": "All Durations",
+      "days": "Days",
+      "packages": "packages",
+      "types": {
+        "All": "All",
+        "Beach Side": "Beach Side",
+        "Hill Country": "Hill Country",
+        "Safari": "Safari",
+        "Cultural Heritage": "Cultural Heritage",
+        "Adventure": "Adventure",
+        "Wellness & Ayurveda": "Wellness & Ayurveda"
+      }
+    },
+    "grid": {
+      "noPackagesTitle": "No packages found",
+      "noPackagesSub": "Try adjusting your filters to discover more Sri Lanka experiences."
+    },
+    "card": {
+      "more": "more",
+      "days": "Days",
+      "available": "Available",
+      "unavailable": "Unavailable",
+      "bookBtn": "Book Now",
+      "detailsBtn": "Details"
+    },
+    "modal": {
+      "destinations": "Destinations",
+      "destinationsItinerary": "Destinations & Itinerary",
+      "day": "day",
+      "days": "days",
+      "activities": "Activities",
+      "bookBtn": "Book This Package",
+      "backBtn": "← Back to packages",
+      "seeGuide": "See guide",
+      "noGuide": "No guide is linked to this package.",
+      "guideName": "Guide Name",
+      "nic": "NIC",
+      "contactDetails": "Contact Details",
+      "recommendedTitle": "Recommended For You",
+      "personalizedPicks": "Personalized picks",
+      "tailoredRecs": "Tailored recommendations",
+      "sameDuration": "Same duration",
+      "sameType": "Same type",
+      "topRated": "Top rated",
+      "mostBooked": "Most booked"
+    }
+  },
+  "customBooking": {
+    "header": {
+      "tag": "Tailor-Made Journeys",
+      "title1": "Your Trip,",
+      "title2": "Your Way.",
+      "desc": "Design your dream Sri Lankan adventure. Select your favorite destinations, thrilling activities, and let us handle the rest."
+    },
+    "guestGuard": {
+      "title": "Login Required",
+      "desc": "You need to be logged in to design and book your own customized Sri Lankan adventure.",
+      "signIn": "Sign In",
+      "createAccount": "Create Account"
+    },
+    "success": {
+      "title": "Your Journey Awaits!",
+      "ref": "Booking Reference:",
+      "nextSteps": "Next Steps:",
+      "step1": "Our travel experts will review your custom itinerary",
+      "step2": "A personalized price quote will be sent to your profile",
+      "step3": "You'll receive an email notification once reviewed",
+      "step4": "Accept the quote to finalize your dream vacation",
+      "viewBookings": "View My Bookings",
+      "backHome": "Back to Home"
+    },
+    "review": {
+      "badge": "Customized Itinerary",
+      "title": "Review Your Plan",
+      "desc": "Almost there! Please verify your travel details before submitting.",
+      "destDates": "Destinations & Dates",
+      "route": "Route",
+      "activities": "Activities",
+      "travelPeriod": "Travel Period",
+      "pickupTime": "Pickup Time",
+      "passVeh": "Passengers & Vehicle",
+      "travelers": "Travelers",
+      "vehType": "Vehicle Type",
+      "luggage": "Luggage",
+      "contactName": "Contact Name",
+      "thoughts": "Traveler's Thoughts",
+      "thoughtsNote": "Note: These details will be carefully reviewed by the Ceylon Best Tour team. We will plan the most efficient route and handle all necessary arrangements (hotels, permits, etc.) based on your ideas.",
+      "specialReq": "Special Requests",
+      "subNoticeTitle": "Submission Notice",
+      "subNoticeDesc": "By clicking \"Submit Booking\", your request will be sent to our team for manual review. We will calculate the best possible price based on your route and requirements. No payment is required at this stage."
+    },
+    "side": {
+      "processTitle": "Your Process",
+      "step1Title": "Design",
+      "step1Desc": "Pick your stops and activities.",
+      "step2Title": "Review",
+      "step2Desc": "Our team crafts the best price.",
+      "step3Title": "Embark",
+      "step3Desc": "Approve and start your tour.",
+      "assistTitle": "Need Assistance?",
+      "assistDesc": "Let our travel consultants help you build the perfect itinerary.",
+      "callBtn": "Call Experts",
+      "policyTitle": "Booking Policy",
+      "policyDesc": "Custom tours require manual quotation. Quotes are typically ready within 24 hours. No upfront payment required to submit."
+    },
+    "form": {
+      "steps": ["Your Plan", "Passengers", "More Info", "Review"],
+      "editing": "Editing Booking:",
+      "cancelEdit": "Cancel Edit",
+      "pickStops": "Pick Your Stops",
+      "pickStopsDesc": "Add cities and landmarks to your personal route.",
+      "addDest": "Add Destination",
+      "addActivity": "Add Activity",
+      "max7": "(Max 7)",
+      "selectCity": "Select a city...",
+      "selectActivity": "Select an activity...",
+      "addBtn": "Add",
+      "routeItinerary": "Route Itinerary",
+      "selectUpTo7Dest": "Select up to 7 destinations for your route",
+      "selectedActivities": "Selected Activities",
+      "selectUpTo7Act": "Choose up to 7 adventure activities",
+      "travelDates": "Travel Dates",
+      "travelDatesDesc": "When would you like to start your journey?",
+      "depDate": "Departure Date *",
+      "retDate": "Return Date *",
+      "pickupTimeLabel": "Pickup Time *",
+      "totalDuration": "Total Duration",
+      "fullDay": "Full Day",
+      "incDays": "Incredible Days",
+      "tripRange": "Trip Range",
+      "dreamItinerary": "Your Dream Itinerary",
+      "dreamDesc": "Share your thoughts, experiences, or specific ideas for this tour.",
+      "dreamPlaceholder": "E.g. I saw a video about the Nine Arch Bridge and would love to experience it at sunrise... I'm a big fan of Ceylon tea and want to visit a factory...",
+      "dreamHint": "Don't worry about the specifics - just tell us what you're dreaming of!",
+      "backBtn": "Back",
+      "nextBtn": "Next Step",
+      "processing": "Processing...",
+      "submitBtn": "Submit Booking"
+    }
+  },
+  "p2pBooking": {
+    "header": {
+      "tag": "Reliable Transfers",
+      "title1": "Point to ",
+      "title2": "Point.",
+      "desc": "Professional drivers and premium vehicles for seamless transfers across Sri Lanka."
+    },
+    "guestGuard": {
+      "title": "Login Required",
+      "desc": "You need to be logged in to place a booking.",
+      "login": "Login",
+      "register": "Register"
+    },
+    "success": {
+      "title": "Booking Submitted!",
+      "ref": "Your booking reference is:",
+      "step1": "Your booking is now PENDING",
+      "step2": "Our team will review and send a price quote within 24 hours",
+      "step3": "You can track your booking status from your profile",
+      "viewBookings": "View My Bookings"
+    },
+    "form": {
+      "steps": ["Trip Details", "Passengers", "More Info", "Review"],
+      "title": "Point-to-Point Transfer",
+      "mainTitle1": "Book Your ",
+      "mainTitle2": "Transfer.",
+      "mainDesc": "Reliable one-way transfers between any two locations in Sri Lanka with professional drivers and premium vehicles.",
+      "backBtn": "Back",
+      "nextBtn": "Next",
+      "submitting": "Submitting...",
+      "submitBtn": "Submit Booking"
+    },
+    "tripStep": {
+      "locationsTitle": "Trip Locations",
+      "locationsDesc": "Type to search — use ↑ ↓ to navigate, Enter to select, Esc to close. You can also type a custom location name.",
+      "pickupLabel": "Pickup Location *",
+      "pickupPlaceholder": "Search airport, city, hotel area…",
+      "oneWay": "One way",
+      "dropoffLabel": "Drop-off Location *",
+      "dropoffPlaceholder": "Search tourist spot, city, beach…",
+      "dateTimeTitle": "Travel Date & Time",
+      "dateTimeDesc": "Point-to-point is a one-day hire. Select your travel date and preferred pickup time.",
+      "dateLabel": "Travel Date *",
+      "timeLabel": "Preferred Pickup Time *",
+      "oneDayTransfer": "One-Day Transfer"
+    },
+    "reviewStep": {
+      "title": "Review Your Booking",
+      "desc": "Please review all details before submitting. Our team will respond with a price quote within 24 hours.",
+      "badge": "Point-to-Point Transfer",
+      "tripDetails": "Trip Details",
+      "pickupLoc": "Pickup Location",
+      "dropoffLoc": "Drop-off Location",
+      "travelDates": "Travel Dates",
+      "pickupTime": "Pickup Time",
+      "totalDays": "Total Days",
+      "passVeh": "Passengers & Vehicle",
+      "adults": "Adults",
+      "children": "Children",
+      "luggage": "Luggage",
+      "vehCategory": "Vehicle Category",
+      "contactDetails": "Contact Details",
+      "fullName": "Full Name",
+      "email": "Email",
+      "phone": "Phone",
+      "notes": "Additional Notes",
+      "emergencyContact": "Emergency Contact",
+      "emergencyName": "Emergency Contact Name",
+      "relationship": "Relationship",
+      "emergencyPhone": "Emergency Contact Phone",
+      "noEmergency": "No emergency contact provided.",
+      "whatHappensNext": "What happens after you submit?",
+      "nextStep1": "Your booking is submitted with status: PENDING",
+      "nextStep2": "Our team reviews your request within 24 hours",
+      "nextStep3": "We'll send you a price quote through the system",
+      "nextStep4": "You accept or reject the quote from your profile",
+      "nextStep5": "Once accepted, we confirm and assign your vehicle"
+    },
+    "sidePanel": {
+      "howItWorks": "How It Works",
+      "step1Title": "Submit Booking",
+      "step1Desc": "Fill the form and submit your transfer request.",
+      "step2Title": "Receive a Quote",
+      "step2Desc": "Our team reviews and sends a price within 24 hours.",
+      "step3Title": "Accept & Confirm",
+      "step3Desc": "Accept the quote and we'll assign your vehicle.",
+      "emergencyTitle": "Emergency Assistance",
+      "emergencyDesc": "24/7 roadside assistance for all our customers.",
+      "paymentPolicy": "Payment Policy",
+      "paymentDesc": "Point-to-Point transfers require a single full payment after the tour ends. No upfront payment required."
+    }
+  },
+  "bookingForm": {
+    "passengersStep": {
+      "title": "Passengers",
+      "desc": "Tell us how many people will be travelling.",
+      "adults": "Adults",
+      "adultsDesc": "Age 18+",
+      "children": "Children",
+      "childrenDesc": "Age 0–17",
+      "agesOfChildren": "Ages of Children *",
+      "child": "Child",
+      "age": "Age",
+      "babySeatRequired": "Baby Seat Required",
+      "babySeatDesc": "Tick if any child needs a baby seat",
+      "luggageTitle": "Luggage",
+      "luggageDesc": "Enter the number of bags per weight category. This helps us assign the right vehicle.",
+      "customWeight": "Custom Weight",
+      "customWeightDesc": "Oversized or special luggage",
+      "describeCustomLuggage": "Describe your custom luggage *",
+      "customLuggagePlaceholder": "E.g. surfboard 8kg, bicycle 15kg, golf bag 20kg",
+      "totalLuggage": "Total: <1>{{count}}</1> piece(s) of luggage",
+      "vehCategoryTitle": "Preferred Vehicle Category *",
+      "vehCategoryDesc": "Select your preferred vehicle category. Our team will assign the actual vehicle after confirmation."
+    },
+    "notesStep": {
+      "contactDetails": "Contact Details",
+      "contactDesc": "We'll use this to reach you about your booking.",
+      "fullName": "Full Name *",
+      "fullNamePlaceholder": "Your full name",
+      "prefilled": "✓ Pre-filled from your account — you can edit this",
+      "phoneNum": "Phone Number *",
+      "phoneVerified": "Phone number verified",
+      "changeNum": "Change number",
+      "sendOtp": "Send OTP",
+      "sending": "Sending…",
+      "weSentOtp": "We sent a 6-digit code to <1>{{phone}}</1>. Enter it below.",
+      "verifyCode": "Verify Code",
+      "verifying": "Verifying…",
+      "resendIn": "Resend in {{s}}s",
+      "resendCode": "Resend code",
+      "otpNotice": "We verify your phone number via a one-time code to ensure our team can reach you. Emergency contact numbers are not verified.",
+      "emergencyContact": "Emergency Contact",
+      "emergencyDesc": "In case of emergency, who should we contact? This is saved to your profile.",
+      "emergencyName": "Emergency Contact Name",
+      "emergencyNamePlaceholder": "Full name of emergency contact",
+      "relationship": "Relationship",
+      "selectRelationship": "Select relationship",
+      "emergencyPhone": "Emergency Contact Phone",
+      "additionalNotes": "Additional Notes",
+      "notesDesc": "Any special requests, preferences, or information for the driver.",
+      "notesPlaceholder": "E.g. early morning pickup, wheelchair access needed, stop at airport first…"
+    },
+    "packageForm": {
+      "loginReq": "Login Required",
+      "loginDesc": "You need to be logged in to place a booking.",
+      "loginBtn": "Login",
+      "registerBtn": "Register",
+      "successTitle": "Booking Submitted!",
+      "successRef": "Your booking reference is:",
+      "successStep1": "Your booking is now PENDING review",
+      "successStep2": "Our team will send a price quote within 24 hours",
+      "successStep3": "You can track your booking status from your profile",
+      "viewBookings": "View My Bookings",
+      "backToPackages": "Back to Packages",
+      "bookPrefix": "Book: ",
+      "completeBooking": "Complete your package tour booking",
+      "backBtn": "Back",
+      "nextBtn": "Next",
+      "submitting": "Submitting...",
+      "submitBooking": "Submit Booking",
+      "pkgDetails": "Package Details",
+      "selectedPkg": "Selected Package",
+      "yourPkgTitle": "📦 Your Package",
+      "yourPkgDesc": "Package tour details and travel dates.",
+      "travelDatesTitle": "📅 Travel Dates",
+      "travelDatesDesc": "When would you like to travel?",
+      "startDate": "Start Date *",
+      "endDate": "End Date",
+      "endDatePlaceholder": "Select a start date to calculate the end date",
+      "pickupTime": "🕐 Preferred Pickup Time *",
+      "tripDays": "<1>{{days}}</1> Day Trip",
+      "pkgDuration": "Package duration: <1>{{days}}</1> day(s)"
+    }
+  },
+  "vehicleCategory": {
+    "hero": {
+      "badge": "Our Fleet",
+      "titlePart1": "Vehicle ",
+      "titlePart2": "Categories.",
+      "desc": "Discover the perfect class of vehicle for your lifestyle, from executive luxury to rugged utility."
+    },
+    "tabs": {
+      "browseByCategory": "Browse by Category",
+      "clickToSee": "Click any category to see vehicles",
+      "all": "All",
+      "viewAll": "View All",
+      "vehiclesCount": "<1>{{count}}</1> vehicles"
+    },
+    "showcase": {
+      "bestFor": "✨ Best for: {{bestFor}}",
+      "availableCount": "🚗 {{count}} Available",
+      "defaultDesc": "Quality vehicles for your journey.",
+      "defaultBestFor": "All travelers",
+      "miniCarDesc": "Perfect for city driving and tight parking spaces. Fuel-efficient and easy to maneuver.",
+      "miniCarBest": "Solo travelers, couples, city tours",
+      "normalCarDesc": "Reliable and comfortable cars perfect for everyday use and small group travel.",
+      "normalCarBest": "Small families, business trips",
+      "sedanCarDesc": "Premium comfort with spacious interiors and elegant design for executive travel.",
+      "sedanCarBest": "Business meetings, airport transfers",
+      "mpvDesc": "Multi-Purpose Vehicles offering versatility, space, and comfort for groups.",
+      "mpvBest": "Family trips, group tours",
+      "suvDesc": "Powerful and rugged vehicles ideal for adventure trips and off-road exploration.",
+      "suvBest": "Adventure trips, hill stations",
+      "miniVanDesc": "Compact vans perfect for small groups needing extra space and comfort.",
+      "miniVanBest": "Small group tours, family vacations",
+      "vanDesc": "Spacious vans ideal for medium-sized groups and luggage-heavy trips.",
+      "vanBest": "Group tours, wedding parties",
+      "largeVanDesc": "Maximum capacity vans for large groups and extensive cargo transportation.",
+      "largeVanBest": "Large groups, corporate events"
+    },
+    "filters": {
+      "showing": "Showing",
+      "vehicles": "vehicles",
+      "reset": "Reset Filters",
+      "search": "Search",
+      "searchPlaceholder": "Search vehicles...",
+      "transmission": "Transmission",
+      "allTransmissions": "All transmissions",
+      "automatic": "Automatic",
+      "manual": "Manual",
+      "fuelType": "Fuel Type",
+      "allFuelTypes": "All fuel types",
+      "petrol": "Petrol",
+      "diesel": "Diesel",
+      "electric": "Electric",
+      "hybrid": "Hybrid",
+      "sortBy": "Sort By",
+      "sortDefault": "Default",
+      "priceLowHigh": "Price: Low to High",
+      "priceHighLow": "Price: High to Low",
+      "seatsLowHigh": "Seats: Low to High",
+      "seatsHighLow": "Seats: High to Low"
+    },
+    "grid": {
+      "categoryVehicles": "{{category}} Vehicles",
+      "allAvailableVehicles": "All Available Vehicles",
+      "choosePerfect": "Choose the perfect vehicle for your journey",
+      "noVehicles": "No Vehicles Found",
+      "noVehiclesCategory": "Sorry, we don't have any vehicles in the \"{{category}}\" category at the moment. Please check back later or browse other categories.",
+      "noVehiclesFilters": "No vehicles match your current filters. Try adjusting your search criteria."
+    },
+    "card": {
+      "available": "Available",
+      "startingAt": "Starting at",
+      "perDay": "/day",
+      "seats": "{{count}} Seats",
+      "bags": "{{count}} Bags",
+      "viewDetails": "View Details",
+      "bookNow": "Book Now",
+      "notAvailable": "Not Available",
+      "insuranceExpired": "Insurance Expired"
+    },
+    "modal": {
+      "dailyRentalPrice": "Daily Rental Price",
+      "bookThisVehicle": "🎯 Book This Vehicle",
+      "vehicleSpecs": "Vehicle Specifications",
+      "vehicleDetails": "Vehicle Details",
+      "brand": "Brand",
+      "model": "Model",
+      "year": "Year",
+      "color": "Color",
+      "license": "Vehicle License",
+      "engine": "Engine",
+      "mileage": "Mileage",
+      "insurance": "Insurance",
+      "insuranceStart": "Insurance Start",
+      "insuranceEnd": "Insurance End",
+      "insuranceStatus": "Insurance Status",
+      "expired": "Expired",
+      "valid": "Valid",
+      "comfortConv": "Comfort & Convenience",
+      "airCond": "Air Conditioning",
+      "climateControl": "Climate control system",
+      "fullyInsured": "Fully Insured",
+      "renewalReq": "Renewal required before bookings.",
+      "compCoverage": "Comprehensive coverage",
+      "support": "24/7 Support",
+      "roadside": "Roadside assistance",
+      "addFeatures": "Additional Features",
+      "close": "Close"
+    },
+    "messages": {
+      "pleaseLogin": "Please login to book a vehicle"
+    }
+  },
+  "gallery": {
+    "header": {
+      "badge": "Traveler's Gallery",
+      "title": "A Glimpse into Paradise.",
+      "desc": "Real stories and moments captured by our travelers across the beautiful landscapes of Sri Lanka."
+    },
+    "cta": {
+      "title": "Ready to Make Memories?",
+      "desc": "Book your tour today and start your own adventure.",
+      "btn": "Start Planning"
+    },
+    "filters": {
+      "searchPlaceholder": "Search memories, locations, or tags...",
+      "filtersBtn": "Filters",
+      "allSeasons": "All Seasons",
+      "allVibes": "All Vibes",
+      "allLocations": "All Locations",
+      "ourCustomers": "Our Customers",
+      "customersMobile": "Customers",
+      "activeFilters": "Active Filters:",
+      "clearAll": "Clear all"
+    },
+    "results": {
+      "loadingBackend": "Loading from backend...",
+      "showing": "Showing",
+      "tourExperiences": "tour experiences",
+      "loadingTitle": "Loading Memories",
+      "loadingDesc": "Getting the latest photos from our travelers' adventures...",
+      "noPhotos": "No Photos Found",
+      "noPhotosDesc": "We couldn't find any photos matching your current filters. Try adjusting your search criteria.",
+      "clearAllBtn": "Clear All Filters"
+    },
+    "card": {
+      "featured": "Featured"
+    }
+  }
+}
