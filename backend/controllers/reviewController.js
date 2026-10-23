@@ -67,84 +67,68 @@ const extractUploadedImageUrl = (file) => {
   return file.path || file.url || file.secure_url || file.location || file.filename || null;
 };
 
-const getPublishedReviews = async (_req, res) => {
+const mapReviewRow = (row) => ({
+  id: `r-${row.review_id}`,
+  bookingId: row.booking_id,
+  user: {
+    name: row.customer_name,
+    email: row.customer_email,
+    country: row.customer_country || 'Sri Lanka',
+    countryFlag: getCountryFlag(row.customer_country),
+    avatar: null,
+  },
+  tourTitle: row.tour_title || 'Tour Booking',
+  tourType: row.tour_type || 'Tour',
+  stars: row.rating,
+  driverName: row.driver_name || '',
+  title: row.title || 'Guest Review',
+  comment: row.feedback,
+  images: Array.isArray(row.images) ? row.images : [],
+  datePublished: new Date(row.created_at).toISOString().split('T')[0],
+});
+
+const getPublishedReviews = async (req, res) => {
+  const { stars, tourType, sort, email } = req.query;
+  const starParam = stars && stars !== 'All' ? parseInt(stars, 10) : null;
+  const tourTypeParam = tourType && tourType !== 'All' ? tourType : null;
+  const sortParam = sort || 'newest';
+  const emailParam = email ? email.trim() : null;
+
   try {
-    const { rows: reviews } = await pool.query(`
-      SELECT
-        r.review_id,
-        r.booking_id,
-        r.rating,
-        r.driver_name,
-        r.title,
-        r.feedback,
-        r.created_at,
-        u.name AS customer_name,
-        u.email AS customer_email,
-        u.country AS customer_country,
-        b.tour_type,
-        COALESCE(p.title, b.tour_type::TEXT) AS tour_title
-      FROM review r
-      INNER JOIN "user" u ON u.user_id = r.user_id
-      INNER JOIN booking b ON b.booking_id = r.booking_id
-      LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-      LEFT JOIN package p ON p.package_id = bp.package_id
-      ORDER BY r.created_at DESC
-    `);
+    const { rows } = await pool.query(
+      `SELECT * FROM fn_get_filtered_reviews($1, $2, $3, $4)`,
+      [starParam, tourTypeParam, sortParam, emailParam]
+    );
 
-    const { rows: images } = await pool.query(`
-      SELECT review_id, image_url
-      FROM review_image
-    `);
-
-    const imagesByReviewId = images.reduce((acc, item) => {
-      if (!acc[item.review_id]) acc[item.review_id] = [];
-      acc[item.review_id].push(item.image_url);
-      return acc;
-    }, {});
-
-    const result = reviews.map((row) => ({
-      id: `r-${row.review_id}`,
-      bookingId: row.booking_id,
-      user: {
-        name: row.customer_name,
-        email: row.customer_email,
-        country: row.customer_country || 'Sri Lanka',
-        countryFlag: getCountryFlag(row.customer_country),
-        avatar: null,
-      },
-      tourTitle: row.tour_title || 'Tour Booking',
-      tourType: row.tour_type || 'Tour',
-      stars: row.rating,
-      driverName: row.driver_name || '',
-      title: row.title || 'Guest Review',
-      comment: row.feedback,
-      images: imagesByReviewId[row.review_id] || [],
-      datePublished: new Date(row.created_at).toISOString().split('T')[0],
-    }));
-
-    res.json({ reviews: result });
+    res.json({ reviews: rows.map(mapReviewRow) });
   } catch (error) {
     console.error('getPublishedReviews failed:', error);
     res.status(500).json({ message: 'Failed to load reviews.' });
   }
 };
 
+const getMyReviews = async (req, res) => {
+  const email = req.user?.email;
+  if (!email) return res.status(401).json({ message: 'Not authenticated.' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM fn_get_filtered_reviews(NULL, NULL, 'newest', $1)`,
+      [email]
+    );
+
+    res.json({ reviews: rows.map(mapReviewRow) });
+  } catch (err) {
+    console.error('getMyReviews error:', err);
+    res.status(500).json({ message: 'Failed to load your reviews.' });
+  }
+};
+
 const getReviewStats = async (_req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT
-        COUNT(*) AS total_reviews,
-        COALESCE(SUM(rating), 0) AS rating_sum,
-        COALESCE(AVG(rating), 0) AS average_rating,
-        SUM(CASE WHEN rating = 5 THEN 1 ELSE 0 END) AS five_star_reviews,
-        SUM(CASE WHEN rating = 4 THEN 1 ELSE 0 END) AS four_star_reviews,
-        SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) AS three_star_reviews,
-        SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END) AS two_star_reviews,
-        SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) AS one_star_reviews
-      FROM review
-    `);
-
+    const { rows } = await pool.query(`SELECT * FROM review_star_summary`);
     const row = rows[0] || {};
+
     const breakdown = {
       5: Number(row.five_star_reviews) || 0,
       4: Number(row.four_star_reviews) || 0,
@@ -310,6 +294,7 @@ const createReview = async (req, res) => {
 
 module.exports = {
   getPublishedReviews,
+  getMyReviews,
   getReviewStats,
   getReviewableTours,
   createReview,

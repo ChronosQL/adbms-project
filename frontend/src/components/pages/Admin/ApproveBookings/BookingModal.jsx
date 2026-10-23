@@ -89,8 +89,24 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
     setVehiclesLoading(true);
     try {
       const data = await api.get(`/vehicles/category/${categoryId}`);
-      setVehicles(data.data || []);
-      if (booking.vehicleId) setSelectedVehicleId(booking.vehicleId);
+      const fleet = data.data || [];
+      setVehicles(fleet);
+
+      if (booking.vehicleId) {
+        setSelectedVehicleId(String(booking.vehicleId));
+        const match = fleet.find(v => String(v.id) === String(booking.vehicleId));
+        if (match) {
+          setVPlate(match.license_plate || match.vehicle_number || "");
+        }
+      } else if (fleet.length > 0) {
+        const first = fleet[0];
+        setSelectedVehicleId(String(first.id));
+        setVPlate(first.license_plate || first.vehicle_number || "");
+        const days = getBookingDays();
+        if (first.price_per_day != null && (!price || price === "0.00" || price === "")) {
+          setPrice((Number(first.price_per_day) * days).toFixed(2));
+        }
+      }
     } catch (err) {
       console.error('Error loading vehicles:', err);
       setVehicles([]);
@@ -401,9 +417,13 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
                     setVPlate("");
                     setPrice(booking.quotedPrice ?? "");
                   }} style={inputStyle}>
-                    <option value="">{categoriesLoading ? "Loading categories..." : "Select vehicle category"}</option>
+                    <option value="" style={{ color: "#0f172a", background: "#ffffff" }}>
+                      {categoriesLoading ? "Loading categories..." : "Select vehicle category"}
+                    </option>
                     {categories.map((category) => (
-                      <option key={category.id} value={category.id}>{category.name}</option>
+                      <option key={category.id} value={category.id} style={{ color: "#0f172a", background: "#ffffff" }}>
+                        {category.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -419,9 +439,11 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
                       setVType(vehicle.category_name || booking.categoryName || VEHICLE_LABELS[booking.categoryId] || "");
                     }
                   }} style={inputStyle}>
-                    <option value="">{vehiclesLoading ? "Loading vehicles..." : "Select a vehicle"}</option>
+                    <option value="" style={{ color: "#0f172a", background: "#ffffff" }}>
+                      {vehiclesLoading ? "Loading vehicles..." : "Select a vehicle"}
+                    </option>
                     {vehicles.map(v => (
-                      <option key={v.id} value={v.id}>
+                      <option key={v.id} value={v.id} style={{ color: "#0f172a", background: "#ffffff" }}>
                         {v.vehicle_name ? `${v.vehicle_name} (${v.vehicle_number || v.license_plate || 'No plate'})` : `${v.vehicle_number || v.license_plate || 'Unnamed vehicle'}`}
                       </option>
                     ))}
@@ -548,7 +570,13 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
               )}
 
               {/* Record Form */}
-              {paymentsData && paymentsData.remainingAmount > 0 ? (
+              {booking.status === "CLOSED" || booking.status === "CANCELLED" ? (
+                <div style={{ borderTop: `1px solid ${border}`, paddingTop: 15, textAlign: "center" }}>
+                  <p style={{ margin: 0, fontSize: 12, color: ts, fontWeight: 700 }}>
+                    🔒 Booking is {booking.status.toLowerCase()}. No further payments can be initiated or recorded.
+                  </p>
+                </div>
+              ) : paymentsData && paymentsData.remainingAmount > 0 ? (
                 <form onSubmit={handleRecordPayment} style={{ borderTop: `1px solid ${border}`, paddingTop: 15 }}>
                   <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: tm }}>✍️ Record Received Payment</p>
                   
@@ -569,13 +597,13 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
                         }} 
                         style={inputStyle}
                       >
-                        <option value="">-- Select --</option>
-                        {booking.tourType !== 'P2P' && <option value="DEPOSIT">DEPOSIT (50%)</option>}
-                        {booking.tourType !== 'P2P' && <option value="FINAL">FINAL (50%)</option>}
+                        <option value="" style={{ color: "#0f172a", background: "#ffffff" }}>-- Select --</option>
+                        {booking.tourType !== 'P2P' && <option value="DEPOSIT" style={{ color: "#0f172a", background: "#ffffff" }}>DEPOSIT (50%)</option>}
+                        {booking.tourType !== 'P2P' && <option value="FINAL" style={{ color: "#0f172a", background: "#ffffff" }}>FINAL (50%)</option>}
                         {booking.tourType !== 'P2P' && paymentsData.installments?.some(i => i.type === 'Additional Charges') && (
-                          <option value="ADDITIONAL">ADDITIONAL CHARGES</option>
+                          <option value="ADDITIONAL" style={{ color: "#0f172a", background: "#ffffff" }}>ADDITIONAL CHARGES</option>
                         )}
-                        <option value="FULL">FULL PAYMENT</option>
+                        <option value="FULL" style={{ color: "#0f172a", background: "#ffffff" }}>FULL PAYMENT</option>
                       </select>
                     </div>
                     
@@ -591,11 +619,10 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
                     </div>
 
                     <div>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: ts, display: "block", marginBottom: 4 }}>Payment Method *</label>
-                      <select value={recMethod} onChange={e => setRecMethod(e.target.value)} style={inputStyle}>
-                        <option value="CASH">CASH</option>
-                        <option value="BANK_TRANSFER">BANK TRANSFER</option>
-                      </select>
+                      <label style={{ fontSize: 10, fontWeight: 700, color: ts, display: "block", marginBottom: 4 }}>Payment Method</label>
+                      <div style={{ ...inputStyle, background: card, fontWeight: 700, color: tm, display: "flex", alignItems: "center", gap: 6 }}>
+                        💵 Cash (Desk Receipt)
+                      </div>
                     </div>
 
                     <div>
