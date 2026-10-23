@@ -321,8 +321,8 @@ const recordPayment = async (req, res) => {
   const { booking_id, installment, amount, payment_method, received_date, notes } = req.body;
   const adminId = req.user.id;
 
-  if (!booking_id || !installment || !amount || !payment_method || !received_date) {
-    return res.status(400).json({ message: 'All fields (booking_id, installment, amount, payment_method, received_date) are required.' });
+  if (!booking_id || !installment || !amount || !received_date) {
+    return res.status(400).json({ message: 'All required payment fields (booking_id, installment, amount, received_date) must be provided.' });
   }
 
   try {
@@ -331,10 +331,19 @@ const recordPayment = async (req, res) => {
       return res.status(404).json({ message: 'Booking not found.' });
     }
 
+    const booking = bookingRows[0];
+    if (booking.booking_status === 'CLOSED' || booking.booking_status === 'CANCELLED') {
+      return res.status(400).json({
+        message: `Cannot record payment. Booking is already ${booking.booking_status.toLowerCase()}.`
+      });
+    }
+
+    const resolvedMethod = payment_method || 'CASH';
+
     const { rows } = await db.query(`
       INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, recorded_by, status, notes)
       VALUES ($1, $2, $3, $4, $5, $6, 'APPROVED', $7) RETURNING payment_id
-    `, [booking_id, installment, amount, payment_method, received_date, adminId, notes || null]);
+    `, [booking_id, installment, amount, resolvedMethod, received_date, adminId, notes || null]);
 
     res.status(201).json({
       message: 'Payment recorded successfully.',

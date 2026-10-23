@@ -22,6 +22,13 @@ export const fetchPublishedReviews = async (filters = {}) => {
   return data.reviews || [];
 };
 
+export const fetchMyReviews = async (token) => {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(buildApiUrl('/reviews/my'), { credentials: 'include', headers });
+  const data = await getJson(res);
+  return data.reviews || [];
+};
+
 export const fetchReviewStats = async () => {
   const res = await fetch(buildApiUrl('/reviews/stats'));
   const data = await getJson(res);
