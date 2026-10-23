@@ -1,5 +1,6 @@
 const db = require('../db/connection');
 const PDFDocument = require('pdfkit');
+const { parsePagination } = require('../utils/paginate');
 
 const formatDate = (val) => {
   if (!val) return null;
@@ -251,22 +252,38 @@ const createP2PBooking = async (req, res) => {
 };
 
 const getMyBookings = async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      `SELECT b.*, u.email, u.emergency_name, u.emergency_phone, u.emergency_relationship,
-              vc.category_name,
-              p.package_id, p.title AS package_name
-       FROM booking b
-       JOIN "user" u ON u.user_id = b.user_id
-       LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-       LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-       LEFT JOIN package p ON p.package_id = bp.package_id
-       WHERE b.user_id = $1
-       ORDER BY b.booking_date DESC, b.booking_id DESC`,
-      [req.user.id]
-    );
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 10, 50);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
 
-    res.json({ bookings: rows.map(mapBooking) });
+  try {
+    let query = `
+      SELECT b.*, u.email, u.emergency_name, u.emergency_phone, u.emergency_relationship,
+             vc.category_name,
+             p.package_id, p.title AS package_name,
+             COUNT(*) OVER()::integer AS total_count
+      FROM booking b
+      JOIN "user" u ON u.user_id = b.user_id
+      LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
+      LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
+      LEFT JOIN package p ON p.package_id = bp.package_id
+      WHERE b.user_id = $1
+      ORDER BY b.booking_date DESC, b.booking_id DESC
+    `;
+    const params = [req.user.id];
+
+    if (isPaginated) {
+      query += ` LIMIT $2 OFFSET $3`;
+      params.push(limit, offset);
+    }
+
+    const { rows } = await db.query(query, params);
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    const bookings = rows.map(mapBooking);
+    bookings.pagination = pagination;
+
+    res.json({ bookings, pagination });
   } catch (err) {
     console.error('getMyBookings error:', err);
     res.status(500).json({ message: 'Failed to load bookings.' });
@@ -274,22 +291,39 @@ const getMyBookings = async (req, res) => {
 };
 
 const getAllBookings = async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      `SELECT b.*, u.email, u.emergency_name, u.emergency_phone, u.emergency_relationship,
-              vc.category_name,
-              p.package_id, p.title AS package_name,
-              v.vehicle_number, v.name AS vehicle_name
-       FROM booking b
-       JOIN "user" u ON u.user_id = b.user_id
-       LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-       LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-       LEFT JOIN package p ON p.package_id = bp.package_id
-       LEFT JOIN vehicle v ON v.vehicle_id = b.vehicle_id
-       ORDER BY b.booking_date DESC, b.booking_id DESC`
-    );
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 10, 100);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
 
-    res.json({ bookings: rows.map(mapBooking) });
+  try {
+    let query = `
+      SELECT b.*, u.email, u.emergency_name, u.emergency_phone, u.emergency_relationship,
+             vc.category_name,
+             p.package_id, p.title AS package_name,
+             v.vehicle_number, v.name AS vehicle_name,
+             COUNT(*) OVER()::integer AS total_count
+      FROM booking b
+      JOIN "user" u ON u.user_id = b.user_id
+      LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
+      LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
+      LEFT JOIN package p ON p.package_id = bp.package_id
+      LEFT JOIN vehicle v ON v.vehicle_id = b.vehicle_id
+      ORDER BY b.booking_date DESC, b.booking_id DESC
+    `;
+    const params = [];
+
+    if (isPaginated) {
+      query += ` LIMIT $1 OFFSET $2`;
+      params.push(limit, offset);
+    }
+
+    const { rows } = await db.query(query, params);
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    const bookings = rows.map(mapBooking);
+    bookings.pagination = pagination;
+
+    res.json({ bookings, pagination });
   } catch (err) {
     console.error('getAllBookings error:', err);
     res.status(500).json({ message: 'Failed to load bookings.' });

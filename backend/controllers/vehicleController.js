@@ -1,4 +1,5 @@
 const db = require('../db/connection');
+const { parsePagination } = require('../utils/paginate');
 
 const DEFAULT_CATEGORIES = [
   { name: 'Mini Car', description: 'Compact cars for city travel.' },
@@ -402,9 +403,12 @@ exports.deleteCategory = async (req, res) => {
   }
 };
 
-exports.listVehicles = async (_req, res) => {
+exports.listVehicles = async (req, res) => {
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 12, 100);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
+
   try {
-    const { rows } = await db.query(`
+    let sql = `
       SELECT
         v.vehicle_id,
         v.category_id,
@@ -430,13 +434,24 @@ exports.listVehicles = async (_req, res) => {
         v.air_conditioning,
         v.mileage,
         v.engine_capacity,
-        v.features
+        v.features,
+        COUNT(*) OVER()::integer AS total_count
       FROM vehicle v
       LEFT JOIN vehicle_category vc ON vc.category_id = v.category_id
       ORDER BY v.vehicle_id DESC
-    `);
+    `;
+    const params = [];
 
-    res.json({ success: true, data: rows.map(mapVehicle) });
+    if (isPaginated) {
+      sql += ` LIMIT $1 OFFSET $2`;
+      params.push(limit, offset);
+    }
+
+    const { rows } = await db.query(sql, params);
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    res.json({ success: true, data: rows.map(mapVehicle), pagination });
   } catch (error) {
     console.error('listVehicles error:', error);
     res.status(500).json({ success: false, message: 'Failed to load vehicles.' });

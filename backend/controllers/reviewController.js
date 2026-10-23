@@ -1,4 +1,5 @@
 const pool = require('../db/connection');
+const { parsePagination } = require('../utils/paginate');
 
 const COUNTRY_FLAGS = {
   'Sri Lanka': '🇱🇰',
@@ -94,13 +95,21 @@ const getPublishedReviews = async (req, res) => {
   const sortParam = sort || 'newest';
   const emailParam = email ? email.trim() : null;
 
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 12, 100);
+
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM fn_get_filtered_reviews($1, $2, $3, $4)`,
-      [starParam, tourTypeParam, sortParam, emailParam]
+      `SELECT * FROM fn_get_filtered_reviews($1, $2, $3, $4, $5, $6)`,
+      [starParam, tourTypeParam, sortParam, emailParam, limit, offset]
     );
 
-    res.json({ reviews: rows.map(mapReviewRow) });
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    res.json({
+      reviews: rows.map(mapReviewRow),
+      pagination,
+    });
   } catch (error) {
     console.error('getPublishedReviews failed:', error);
     res.status(500).json({ message: 'Failed to load reviews.' });
@@ -111,13 +120,21 @@ const getMyReviews = async (req, res) => {
   const email = req.user?.email;
   if (!email) return res.status(401).json({ message: 'Not authenticated.' });
 
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 10, 50);
+
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM fn_get_filtered_reviews(NULL, NULL, 'newest', $1)`,
-      [email]
+      `SELECT * FROM fn_get_filtered_reviews(NULL, NULL, 'newest', $1, $2, $3)`,
+      [email, limit, offset]
     );
 
-    res.json({ reviews: rows.map(mapReviewRow) });
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    res.json({
+      reviews: rows.map(mapReviewRow),
+      pagination,
+    });
   } catch (err) {
     console.error('getMyReviews error:', err);
     res.status(500).json({ message: 'Failed to load your reviews.' });

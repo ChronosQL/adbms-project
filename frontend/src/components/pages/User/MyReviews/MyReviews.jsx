@@ -5,6 +5,7 @@ import { useBookings } from '../../../../context/BookingsContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildApiUrl } from '../../../../config/api';
 import { fetchPublishedReviews } from '../../Site/Reviews/reviewsApi';
+import Pagination from '../../../common/Pagination';
 
 const MyReviews = ({ isEmbedded = false }) => {
   const navigate = useNavigate();
@@ -14,6 +15,8 @@ const MyReviews = ({ isEmbedded = false }) => {
   const [loading, setLoading] = useState(true);
   const [expandedComments, setExpandedComments] = useState(new Set());
   const [expandedImages, setExpandedImages] = useState(new Set());
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(6);
 
   const userEmail = user?.email;
 
@@ -126,6 +129,10 @@ const MyReviews = ({ isEmbedded = false }) => {
     window.addEventListener('reviews:updated', handler);
     return () => window.removeEventListener('reviews:updated', handler);
   }, [userEmail, refreshReviews, getCustomerBookings]);
+
+  const totalReviewPages = Math.ceil(myReviews.length / limit) || 1;
+  const currentReviewPage = Math.min(page, totalReviewPages);
+  const paginatedReviews = myReviews.slice((currentReviewPage - 1) * limit, currentReviewPage * limit);
 
   return (
     <>
@@ -468,9 +475,10 @@ const MyReviews = ({ isEmbedded = false }) => {
               )}
             </div>
           ) : (
-            <div className="mr-reviews-grid">
-              <AnimatePresence>
-                {myReviews.map((review, i) => (
+            <>
+              <div className="mr-reviews-grid">
+                <AnimatePresence>
+                  {paginatedReviews.map((review, i) => (
                   <motion.div
                     key={review.id}
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -560,7 +568,27 @@ const MyReviews = ({ isEmbedded = false }) => {
                 ))}
               </AnimatePresence>
             </div>
-          )}
+            {myReviews.length > limit && (
+              <div style={{ marginTop: 24 }}>
+                <Pagination
+                  pagination={{
+                    page: currentReviewPage,
+                    totalPages: totalReviewPages,
+                    total: myReviews.length,
+                    limit,
+                  }}
+                  onPageChange={setPage}
+                  onLimitChange={(newLimit) => {
+                    setLimit(newLimit);
+                    setPage(1);
+                  }}
+                  limitOptions={[6, 12, 24]}
+                  itemLabel="reviews"
+                />
+              </div>
+            )}
+          </>
+        )}
         </div>
       </div>
     </>

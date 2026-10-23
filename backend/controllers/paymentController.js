@@ -1,4 +1,5 @@
 const db = require('../db/connection');
+const { parsePagination } = require('../utils/paginate');
 
 const normalizeTourType = (value) => String(value || 'P2P').toUpperCase();
 const getBookingReference = (tourType, bookingId) => {
@@ -19,19 +20,33 @@ const formatLKR = (val) => {
 };
 
 const getAllPayments = async (req, res) => {
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 15, 100);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
+
   try {
-    const { rows } = await db.query(`
+    let sql = `
       SELECT p.payment_id, p.booking_id, p.installment, p.amount, p.payment_method, p.received_date, p.notes, p.status, p.slip_url,
              b.tour_type, b.quoted_price, b.additional_charges, b.start_date, b.end_date, b.customer_name, b.contact_number AS customer_phone,
              u.name AS recorded_by_name,
              c.email AS customer_email,
-             (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE booking_id = b.booking_id AND status = 'APPROVED') AS total_paid
+             (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE booking_id = b.booking_id AND status = 'APPROVED') AS total_paid,
+             COUNT(*) OVER()::integer AS total_count
       FROM payment p
       JOIN booking b ON p.booking_id = b.booking_id
       LEFT JOIN "user" u ON p.recorded_by = u.user_id
       JOIN "user" c ON b.user_id = c.user_id
       ORDER BY CASE p.status WHEN 'PENDING' THEN 0 WHEN 'APPROVED' THEN 1 WHEN 'REJECTED' THEN 2 ELSE 3 END, p.payment_id DESC
-    `);
+    `;
+    const params = [];
+
+    if (isPaginated) {
+      sql += ` LIMIT $1 OFFSET $2`;
+      params.push(limit, offset);
+    }
+
+    const { rows } = await db.query(sql, params);
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
 
     const payments = rows.map((r) => ({
       id: `PAY${String(r.payment_id).padStart(3, '0')}`,
@@ -65,8 +80,9 @@ const getAllPayments = async (req, res) => {
         previewUrl: r.slip_url
       } : null
     }));
+    payments.pagination = pagination;
 
-    res.json({ payments });
+    res.json({ payments, pagination });
   } catch (err) {
     console.error('getAllPayments error:', err);
     res.status(500).json({ message: 'Failed to retrieve payments.' });

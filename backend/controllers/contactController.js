@@ -1,4 +1,5 @@
 const db = require('../db/connection');
+const { parsePagination } = require('../utils/paginate');
 
 const mapInquiry = (row) => ({
   id:            row.inquiry_id,
@@ -42,11 +43,22 @@ const submitInquiry = async (req, res) => {
 };
 
 const getAllInquiries = async (req, res) => {
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 10, 100);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
+
   try {
-    const { rows: inquiries } = await db.query(
-      `SELECT * FROM contact_inquiry ORDER BY submitted_at DESC`
-    );
-    if (inquiries.length === 0) return res.json({ inquiries: [] });
+    let sql = `SELECT *, COUNT(*) OVER()::integer AS total_count FROM contact_inquiry ORDER BY submitted_at DESC`;
+    const params = [];
+    if (isPaginated) {
+      sql += ` LIMIT $1 OFFSET $2`;
+      params.push(limit, offset);
+    }
+
+    const { rows: inquiries } = await db.query(sql, params);
+    const totalCount = inquiries.length > 0 ? inquiries[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    if (inquiries.length === 0) return res.json({ inquiries: [], pagination });
 
     const ids = inquiries.map(i => i.inquiry_id);
     const { rows: replies } = await db.query(
@@ -63,8 +75,9 @@ const getAllInquiries = async (req, res) => {
       ...mapInquiry(i),
       replies: repliesByInquiry[i.inquiry_id] || [],
     }));
+    result.pagination = pagination;
 
-    res.json({ inquiries: result });
+    res.json({ inquiries: result, pagination });
   } catch (err) {
     console.error('getAllInquiries error:', err);
     res.status(500).json({ message: 'Failed to load inquiries.' });
@@ -75,12 +88,22 @@ const getMyInquiries = async (req, res) => {
   const email = req.user?.email;
   if (!email) return res.status(401).json({ message: 'Not authenticated.' });
 
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 10, 50);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
+
   try {
-    const { rows: inquiries } = await db.query(
-      `SELECT * FROM contact_inquiry WHERE LOWER(sender_email) = LOWER($1) ORDER BY submitted_at DESC`,
-      [email]
-    );
-    if (inquiries.length === 0) return res.json({ inquiries: [] });
+    let sql = `SELECT *, COUNT(*) OVER()::integer AS total_count FROM contact_inquiry WHERE LOWER(sender_email) = LOWER($1) ORDER BY submitted_at DESC`;
+    const params = [email];
+    if (isPaginated) {
+      sql += ` LIMIT $2 OFFSET $3`;
+      params.push(limit, offset);
+    }
+
+    const { rows: inquiries } = await db.query(sql, params);
+    const totalCount = inquiries.length > 0 ? inquiries[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    if (inquiries.length === 0) return res.json({ inquiries: [], pagination });
 
     const ids = inquiries.map(i => i.inquiry_id);
     const { rows: replies } = await db.query(
@@ -92,12 +115,13 @@ const getMyInquiries = async (req, res) => {
       return acc;
     }, {});
 
-    res.json({
-      inquiries: inquiries.map(i => ({
-        ...mapInquiry(i),
-        replies: repliesByInquiry[i.inquiry_id] || [],
-      })),
-    });
+    const result = inquiries.map(i => ({
+      ...mapInquiry(i),
+      replies: repliesByInquiry[i.inquiry_id] || [],
+    }));
+    result.pagination = pagination;
+
+    res.json({ inquiries: result, pagination });
   } catch (err) {
     console.error('getMyInquiries error:', err);
     res.status(500).json({ message: 'Failed to load your inquiries.' });

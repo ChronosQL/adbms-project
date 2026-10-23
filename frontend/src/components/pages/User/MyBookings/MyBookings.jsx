@@ -5,6 +5,7 @@ import { useBookings } from "../../../../context/BookingsContext.jsx";
 import MyBookingCard from "./MyBookingCard";
 import MyBookingDetail from "./MyBookingDetail";
 import MyBookingEmpty from "./MyBookingEmpty";
+import Pagination from "../../../common/Pagination";
 
 const MyBookings = () => {
   const { bookings, getCustomerBookings } = useBookings();
@@ -12,6 +13,8 @@ const MyBookings = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState("");
+  const [page, setPage]             = useState(1);
+  const [limit, setLimit]           = useState(5);
 
   useEffect(() => {
     getCustomerBookings()
@@ -20,6 +23,10 @@ const MyBookings = () => {
   }, []);
 
   const selectedBooking = bookings.find((b) => b.id === selectedId) || null;
+
+  const totalPages = Math.ceil(bookings.length / limit) || 1;
+  const currentPage = Math.min(page, totalPages);
+  const paginatedBookings = bookings.slice((currentPage - 1) * limit, currentPage * limit);
 
   if (loading) return (
     <div className="p-10 flex items-center justify-center h-full">
@@ -71,13 +78,32 @@ const MyBookings = () => {
             exit={{ opacity: 0 }}
             className="flex-1 space-y-4 overflow-y-auto"
           >
-            {bookings.map((booking) => (
+            {paginatedBookings.map((booking) => (
               <MyBookingCard
                 key={booking.id}
                 booking={booking}
                 onClick={() => setSelectedId(booking.id)}
               />
             ))}
+            {bookings.length > limit && (
+              <div className="pt-4">
+                <Pagination
+                  pagination={{
+                    page: currentPage,
+                    totalPages,
+                    total: bookings.length,
+                    limit,
+                  }}
+                  onPageChange={setPage}
+                  onLimitChange={(newLimit) => {
+                    setLimit(newLimit);
+                    setPage(1);
+                  }}
+                  limitOptions={[5, 10, 20]}
+                  itemLabel="bookings"
+                />
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

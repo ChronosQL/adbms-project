@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import VehicleCard from './VehicleCard';
+import Pagination from '../../../common/Pagination';
 
 const VehicleList = ({ vehicles, loading, onView, onEdit, onDelete, selectedCategory }) => {
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(8);
+
+    useEffect(() => {
+        setPage(1);
+    }, [selectedCategory]);
+
     if (loading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -42,6 +50,10 @@ const VehicleList = ({ vehicles, loading, onView, onEdit, onDelete, selectedCate
         );
     }
 
+    const totalPages = Math.ceil(vehicles.length / limit) || 1;
+    const currentPage = Math.min(page, totalPages);
+    const paginatedVehicles = vehicles.slice((currentPage - 1) * limit, currentPage * limit);
+
     return (
         <div>
             <div className="flex justify-between items-center mb-4">
@@ -53,7 +65,7 @@ const VehicleList = ({ vehicles, loading, onView, onEdit, onDelete, selectedCate
                 </h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {vehicles.map((vehicle) => (
+                {paginatedVehicles.map((vehicle) => (
                     <VehicleCard
                         key={vehicle.id}
                         vehicle={vehicle}
@@ -63,6 +75,26 @@ const VehicleList = ({ vehicles, loading, onView, onEdit, onDelete, selectedCate
                     />
                 ))}
             </div>
+            {vehicles.length > limit && (
+                <div className="mt-8">
+                    <Pagination
+                        pagination={{
+                            page: currentPage,
+                            totalPages,
+                            total: vehicles.length,
+                            limit,
+                        }}
+                        onPageChange={setPage}
+                        onLimitChange={(newLimit) => {
+                            setLimit(newLimit);
+                            setPage(1);
+                        }}
+                        limitOptions={[8, 16, 24]}
+                        itemLabel="vehicles"
+                        scrollToRef={false}
+                    />
+                </div>
+            )}
         </div>
     );
 };

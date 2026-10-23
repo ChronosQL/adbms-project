@@ -3,6 +3,7 @@ import { DollarSign, Search, CheckCircle, AlertCircle, Clock, RefreshCw, Chevron
 import { useBookings } from "../../../../context/BookingsContext";
 import { useOutletContext } from "react-router-dom";
 import { BRAND, FONT, getTheme } from "../AdminDashboard/adminTheme";
+import Pagination from "../../../common/Pagination";
 
 const STATUS_CFG = {
   PENDING:      { label: "Pending",      color: "#f59e0b" },
@@ -86,6 +87,8 @@ export default function CashPaymentPage() {
   const [toast, setToast] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [bookingPage, setBookingPage] = useState(1);
+  const [bookingLimit, setBookingLimit] = useState(8);
 
   // Form state
   const [form, setForm] = useState({
@@ -187,6 +190,13 @@ export default function CashPaymentPage() {
     );
   });
 
+  const totalBookingPages = Math.ceil(filteredBookings.length / bookingLimit) || 1;
+  const currentBookingPage = Math.min(bookingPage, totalBookingPages);
+  const paginatedBookings = filteredBookings.slice(
+    (currentBookingPage - 1) * bookingLimit,
+    currentBookingPage * bookingLimit
+  );
+
   const approvedPayments = bookingPayments.filter(
     (p) => p.status === "approved" || p.status === "APPROVED"
   );
@@ -262,14 +272,20 @@ export default function CashPaymentPage() {
                 type="text"
                 placeholder="Search by booking ref, customer name…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setBookingPage(1);
+                }}
                 style={{ ...inputStyle, paddingLeft: 34 }}
               />
             </div>
             <div style={{ position: "relative" }}>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setBookingPage(1);
+                }}
                 style={{ ...inputStyle, width: "auto", paddingRight: 32, appearance: "none" }}
               >
                 <option value="ALL">All Statuses</option>
@@ -301,47 +317,69 @@ export default function CashPaymentPage() {
               No bookings match your filter.
             </div>
           ) : (
-            <div style={{ overflowY: "auto", maxHeight: 580 }}>
-              {filteredBookings.map((b) => (
-                <div
-                  key={b.id}
-                  className={`pay-row${selectedBooking?.id === b.id ? " selected" : ""}`}
-                  onClick={() => handleSelectBooking(b)}
-                  style={{
-                    padding: "14px 20px",
-                    borderBottom: `1px solid ${t.divider}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    transition: "background 0.15s",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontFamily: FONT.body, fontWeight: 700, fontSize: 13, color: BRAND.coral }}>
-                      {b.bookingRef || `#${b.id}`}
+            <>
+              <div style={{ overflowY: "auto", maxHeight: 580 }}>
+                {paginatedBookings.map((b) => (
+                  <div
+                    key={b.id}
+                    className={`pay-row${selectedBooking?.id === b.id ? " selected" : ""}`}
+                    onClick={() => handleSelectBooking(b)}
+                    style={{
+                      padding: "14px 20px",
+                      borderBottom: `1px solid ${t.divider}`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      transition: "background 0.15s",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontFamily: FONT.body, fontWeight: 700, fontSize: 13, color: BRAND.coral }}>
+                        {b.bookingRef || `#${b.id}`}
+                      </div>
+                      <div style={{ fontSize: 12, color: t.textSecondary, marginTop: 2 }}>
+                        {b.customerName || "—"} ·{" "}
+                        {b.tourType === "PACKAGE"
+                          ? b.packageName || "Package"
+                          : `${b.startLocation || "?"} → ${b.endLocation || "?"}`}
+                      </div>
+                      <div style={{ fontSize: 11, color: t.textSecondary, marginTop: 1 }}>
+                        {b.startDate || "—"}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: t.textSecondary, marginTop: 2 }}>
-                      {b.customerName || "—"} ·{" "}
-                      {b.tourType === "PACKAGE"
-                        ? b.packageName || "Package"
-                        : `${b.startLocation || "?"} → ${b.endLocation || "?"}`}
-                    </div>
-                    <div style={{ fontSize: 11, color: t.textSecondary, marginTop: 1 }}>
-                      {b.startDate || "—"}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                      <StatusBadge status={b.status} />
+                      {b.quotedPrice && (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: t.textPrimary }}>
+                          ${b.quotedPrice}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                    <StatusBadge status={b.status} />
-                    {b.quotedPrice && (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: t.textPrimary }}>
-                        ${b.quotedPrice}
-                      </span>
-                    )}
-                  </div>
+                ))}
+              </div>
+              {filteredBookings.length > bookingLimit && (
+                <div style={{ padding: "12px 16px", borderTop: `1px solid ${t.divider}` }}>
+                  <Pagination
+                    pagination={{
+                      page: currentBookingPage,
+                      totalPages: totalBookingPages,
+                      total: filteredBookings.length,
+                      limit: bookingLimit,
+                    }}
+                    onPageChange={setBookingPage}
+                    onLimitChange={(newLimit) => {
+                      setBookingLimit(newLimit);
+                      setBookingPage(1);
+                    }}
+                    limitOptions={[6, 8, 16]}
+                    itemLabel="bookings"
+                    scrollToRef={false}
+                  />
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
 

@@ -67,7 +67,7 @@ const Reviews = () => {
   const { getCustomerBookings } = useBookings();
   const navigate     = useNavigate();
   const [reviews, setReviews]       = useState([]);
-  const [filters, setFilters] = useState({ stars: 'All', tourType: '', sort: 'newest' });
+  const [filters, setFilters] = useState({ stars: 'All', tourType: '', sort: 'newest', page: 1, limit: 12 });
   const [stats, setStats] = useState(null);
   const [userBookings, setUserBookings] = useState([]);
   const [serverReviewableTours, setServerReviewableTours] = useState([]);

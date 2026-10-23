@@ -392,7 +392,9 @@ CREATE OR REPLACE FUNCTION fn_get_filtered_reviews(
     p_stars      INTEGER DEFAULT NULL,
     p_tour_type  VARCHAR DEFAULT NULL,
     p_sort       VARCHAR DEFAULT 'newest',
-    p_email      VARCHAR DEFAULT NULL
+    p_email      VARCHAR DEFAULT NULL,
+    p_limit      INTEGER DEFAULT NULL,
+    p_offset     INTEGER DEFAULT 0
 )
 RETURNS TABLE (
     review_id        INTEGER,
@@ -407,7 +409,8 @@ RETURNS TABLE (
     customer_country VARCHAR,
     tour_type        tour_type_enum,
     tour_title       VARCHAR,
-    images           JSONB
+    images           JSONB,
+    total_count      INTEGER
 )
 LANGUAGE plpgsql
 STABLE
@@ -431,7 +434,8 @@ BEGIN
         COALESCE(
             jsonb_agg(ri.image_url) FILTER (WHERE ri.image_url IS NOT NULL),
             '[]'::jsonb
-        ) AS images
+        ) AS images,
+        COUNT(*) OVER()::integer AS total_count
     FROM review r
     INNER JOIN "user" u ON u.user_id = r.user_id
     INNER JOIN booking b ON b.booking_id = r.booking_id
@@ -453,7 +457,9 @@ BEGIN
     ORDER BY
         CASE WHEN p_sort = 'highest' THEN r.rating END DESC,
         CASE WHEN p_sort = 'lowest'  THEN r.rating END ASC,
-        r.created_at DESC;
+        r.created_at DESC
+    LIMIT p_limit
+    OFFSET GREATEST(COALESCE(p_offset, 0), 0);
 END;
 $$;
 

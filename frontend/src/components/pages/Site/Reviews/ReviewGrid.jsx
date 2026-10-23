@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReviewCard from './ReviewCard';
-const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
-  
+import Pagination from '../../../common/Pagination';
+
+const ReviewGrid = ({ reviews, filters = {}, setFilters, pagination = null }) => {
+  const gridTopRef = useRef(null);
 
   const SORT_OPTIONS = [
     { value: 'newest',    label: "Newest First" },
@@ -26,6 +28,8 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
   const sort = filters.sort || 'newest';
   const starFilter = filters.stars || "All";
   const bookingTypeFilter = filters.tourTypeLabel || "All";
+  const activePagination = pagination || reviews.pagination;
+  const totalCount = activePagination ? activePagination.total : reviews.length;
 
   return (
     <>
@@ -114,7 +118,7 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
         .rvg-count span { font-size: 18px; font-weight: 800; color: #0d2b2b; letter-spacing: -0.02em; }
       `}</style>
 
-      <div className="rvg-wrap">
+      <div className="rvg-wrap" ref={gridTopRef}>
         {/* Toolbar */}
         <div className="rvg-toolbar">
           <span className="rvg-toolbar-label">{"Stars"}</span>
@@ -122,7 +126,7 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
             <button
               key={s}
               className={`rvg-star-btn ${starFilter === s ? 'active' : ''}`}
-              onClick={() => setFilters({ ...filters, stars: s })}
+              onClick={() => setFilters({ ...filters, stars: s, page: 1 })}
             >
               {s === "All" ? "All" : `${'★'.repeat(Number(s))} ${s}`}
             </button>
@@ -141,17 +145,17 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
                   ["Point to Point Tours"]: 'P2P',
                   ["All"]: ''
                 };
-                setFilters({ ...filters, tourType: map[type], tourTypeLabel: type });
+                setFilters({ ...filters, tourType: map[type], tourTypeLabel: type, page: 1 });
               }}
             >
               {type}
             </button>
           ))}
-          <span className="rvg-count"><span>{reviews.length}</span> {"reviews"}</span>
+          <span className="rvg-count"><span>{totalCount}</span> {"reviews"}</span>
           <select
             className="rvg-sort"
             value={sort}
-            onChange={e => setFilters({ ...filters, sort: e.target.value })}
+            onChange={e => setFilters({ ...filters, sort: e.target.value, page: 1 })}
           >
             {SORT_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -185,9 +189,20 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
             </AnimatePresence>
           </div>
         )}
+
+        {/* Pagination Controls */}
+        <Pagination
+          pagination={activePagination}
+          onPageChange={(p) => setFilters({ ...filters, page: p })}
+          onLimitChange={(l) => setFilters({ ...filters, limit: l, page: 1 })}
+          limitOptions={[12, 24, 48]}
+          itemLabel="reviews"
+          scrollToRef={gridTopRef}
+        />
       </div>
     </>
   );
 };
 
 export default ReviewGrid;
+
