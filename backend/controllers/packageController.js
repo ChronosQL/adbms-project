@@ -1,5 +1,6 @@
 const db = require('../db/connection');
 const cloudinary = require('cloudinary').v2;
+const { parsePagination } = require('../utils/paginate');
 
 const PACKAGE_TYPE_LABEL_TO_ENUM = {
   'Beach Side': 'BEACH SIDE',
@@ -277,6 +278,8 @@ exports.listPublicPackages = async (req, res) => {
   try {
     const qType = req.query.type || null;
     const qDays = req.query.days || null;
+    const { page, limit, offset, buildPagination } = parsePagination(req.query, 9, 60);
+    const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
 
     const where = [];
     const params = [];
@@ -299,7 +302,7 @@ exports.listPublicPackages = async (req, res) => {
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-    const { rows: packages } = await db.query(`
+    let querySql = `
       SELECT
         p.package_id,
         p.title,
@@ -307,11 +310,21 @@ exports.listPublicPackages = async (req, res) => {
         p.days,
         p.description,
         p.image_url,
-        p.availability_status
+        p.availability_status,
+        COUNT(*) OVER()::integer AS total_count
       FROM package p
       ${whereSql}
       ORDER BY p.package_id DESC
-    `, params);
+    `;
+
+    if (isPaginated) {
+      params.push(limit, offset);
+      querySql += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
+    }
+
+    const { rows: packages } = await db.query(querySql, params);
+    const totalCount = packages.length > 0 ? packages[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
 
     const packageIds = packages.map((p) => p.package_id);
     let ratingsByPackage = {};
@@ -389,7 +402,13 @@ exports.listPublicPackages = async (req, res) => {
         availability: buildAvailabilityPayload(p.availability_status),
       };
     });
-    res.json(result);
+
+    if (isPaginated) {
+      res.json({ packages: result, pagination });
+    } else {
+      result.pagination = pagination;
+      res.json(result);
+    }
   } catch (error) {
     console.error('listPublicPackages failed:', error);
     res.status(500).json({ error: 'Failed to load packages.' });

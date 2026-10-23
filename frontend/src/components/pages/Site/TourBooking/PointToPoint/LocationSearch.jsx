@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
-import { MapPin, Search, X, ChevronDown } from "lucide-react";
-import { SRI_LANKA_LOCATIONS } from "./sriLankaLocations.js";
- 
+import { useState, useRef, useEffect, useCallback } from "react";
+import { MapPin, Search, X, Loader2 } from "lucide-react";
+import { searchLocations } from "../../../../../services/locationService";
+
 const CATEGORY_ICONS = {
   "Airport":       "✈️",
   "Port":          "🚢",
@@ -11,49 +11,84 @@ const CATEGORY_ICONS = {
   "Colombo":       "📍",
   "Hotel Area":    "🏨",
 };
- 
+
 const LocationSearch = ({ value, onChange, placeholder, pinColor = "text-[#EF8354]" }) => {
   const [query, setQuery]       = useState(value || "");
   const [open, setOpen]         = useState(false);
   const [filtered, setFiltered] = useState([]);
+  const [loading, setLoading]   = useState(false);
   const ref                     = useRef(null);
- 
+  const debounceRef             = useRef(null);
+
   // Close on outside click
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
- 
+
   // Sync if parent value changes
   useEffect(() => { setQuery(value || ""); }, [value]);
- 
+
+  const performSearch = useCallback(async (val) => {
+    setLoading(true);
+    try {
+      const results = await searchLocations(val);
+      setFiltered(results.slice(0, 10));
+      setOpen(results.length > 0);
+    } catch (err) {
+      console.warn("LocationSearch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const handleSearch = (val) => {
     setQuery(val);
     onChange(val);
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
     if (val.trim().length < 1) {
       setFiltered([]);
       setOpen(false);
       return;
     }
-    const q = val.toLowerCase();
-    const results = SRI_LANKA_LOCATIONS.filter(loc =>
-      loc.label.toLowerCase().includes(q)
-    ).slice(0, 10);
-    setFiltered(results);
-    setOpen(results.length > 0);
+
+    debounceRef.current = setTimeout(() => {
+      performSearch(val);
+    }, 300);
   };
- 
+
+  const handleFocus = async () => {
+    if (filtered.length > 0) {
+      setOpen(true);
+    } else if (!query.trim()) {
+      setLoading(true);
+      try {
+        const hubs = await searchLocations("");
+        setFiltered(hubs.slice(0, 10));
+        setOpen(hubs.length > 0);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const handleSelect = (loc) => {
-    setQuery(loc.label);
-    onChange(loc.label);
+    const label = loc.label;
+    const coords = loc.lat != null ? { lat: loc.lat, lng: loc.lng } : null;
+    setQuery(label);
+    onChange(label, coords);
     setOpen(false);
     setFiltered([]);
   };
- 
+
   const handleClear = () => {
     setQuery("");
-    onChange("");
+    onChange("", null);
     setFiltered([]);
     setOpen(false);
   };
@@ -74,11 +109,13 @@ const LocationSearch = ({ value, onChange, placeholder, pinColor = "text-[#EF835
           type="text"
           value={query}
           onChange={e => handleSearch(e.target.value)}
-          onFocus={() => { if (filtered.length > 0) setOpen(true); }}
+          onFocus={handleFocus}
           placeholder={placeholder}
           className="w-full pl-9 pr-9 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm outline-none transition-all focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20"
         />
-        {query ? (
+        {loading ? (
+          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#EF8354] animate-spin" />
+        ) : query ? (
           <button
             type="button"
             onClick={handleClear}

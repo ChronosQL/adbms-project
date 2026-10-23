@@ -82,6 +82,10 @@ const mapBooking = (row) => ({
   bookingDate:    formatDate(row.booking_date),
   startLocation:  row.start_location || null,
   endLocation:    row.end_location   || null,
+  pickupLat:      row.pickup_lat !== null && row.pickup_lat !== undefined ? parseFloat(row.pickup_lat) : null,
+  pickupLng:      row.pickup_lng !== null && row.pickup_lng !== undefined ? parseFloat(row.pickup_lng) : null,
+  dropoffLat:     row.dropoff_lat !== null && row.dropoff_lat !== undefined ? parseFloat(row.dropoff_lat) : null,
+  dropoffLng:     row.dropoff_lng !== null && row.dropoff_lng !== undefined ? parseFloat(row.dropoff_lng) : null,
   totalDays:      row.total_days,
   daysRequired:   row.days_required,
   luggage10kg:        row.luggage_10kg        || 0,
@@ -129,6 +133,10 @@ const createP2PBooking = async (req, res) => {
     packageId,
     startLocation,
     endLocation,
+    pickupLat,
+    pickupLng,
+    dropoffLat,
+    dropoffLng,
     selectedCities,
     activities,
     startDate,
@@ -191,11 +199,12 @@ const createP2PBooking = async (req, res) => {
          tour_type, category_id,
          start_date, end_date, pickup_time,
          start_location, end_location,
+         pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
          total_days, days_required,
          luggage_10kg, luggage_25kg, luggage_35kg,
          no_of_adults, no_of_children, ages_of_children,
          notes, tour_thoughts)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
        RETURNING booking_id`,
       [
         req.user.id,
@@ -211,6 +220,10 @@ const createP2PBooking = async (req, res) => {
         pickupTime        || null,
         isPackageBooking ? null : startLocation,
         isPackageBooking ? null : endLocation,
+        isPackageBooking ? null : (pickupLat || null),
+        isPackageBooking ? null : (pickupLng || null),
+        isPackageBooking ? null : (dropoffLat || null),
+        isPackageBooking ? null : (dropoffLng || null),
         totalDays         || 1,
         daysRequired      || 1,
         luggage10kg       || 0,
@@ -342,12 +355,24 @@ const setQuote = async (req, res) => {
       `UPDATE booking
        SET quoted_price = $1, vehicle_id = $2, admin_note = $3,
            booking_status = 'QUOTED', quoted_at = NOW()
-       WHERE booking_id = $4`,
+       WHERE booking_id = $4 AND booking_status = 'PENDING' AND quoted_at IS NULL`,
       [quotedPrice, vehicleId || null, adminNote || null, id]
     );
 
-    if (rowCount === 0)
-      return res.status(404).json({ message: 'Booking not found.' });
+    if (rowCount === 0) {
+      const { rows } = await db.query(
+        'SELECT booking_id, booking_status, quoted_at, quoted_price FROM booking WHERE booking_id = $1',
+        [id]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Booking not found.' });
+      }
+      return res.status(409).json({
+        message: 'A quote has already been provided for this booking or it is no longer pending.',
+        currentStatus: rows[0].booking_status,
+        quotedPrice: rows[0].quoted_price,
+      });
+    }
 
     res.json({ message: 'Quote sent to customer.' });
   } catch (err) {
@@ -411,6 +436,10 @@ const updateBooking = async (req, res) => {
     tourType,
     startLocation,
     endLocation,
+    pickupLat,
+    pickupLng,
+    dropoffLat,
+    dropoffLng,
     selectedCities,
     activities,
     startDate,
@@ -481,16 +510,21 @@ const updateBooking = async (req, res) => {
            category_id = $6,
            start_date = $7, end_date = $8, pickup_time = $9,
            start_location = $10, end_location = $11,
-           total_days = $12, days_required = $13,
-           luggage_10kg = $14, luggage_25kg = $15, luggage_35kg = $16,
-           no_of_adults = $17, no_of_children = $18, ages_of_children = $19,
-           notes = $20, tour_thoughts = $21
-       WHERE booking_id = $22`,
+           pickup_lat = COALESCE($12, pickup_lat),
+           pickup_lng = COALESCE($13, pickup_lng),
+           dropoff_lat = COALESCE($14, dropoff_lat),
+           dropoff_lng = COALESCE($15, dropoff_lng),
+           total_days = $16, days_required = $17,
+           luggage_10kg = $18, luggage_25kg = $19, luggage_35kg = $20,
+           no_of_adults = $21, no_of_children = $22, ages_of_children = $23,
+           notes = $24, tour_thoughts = $25
+       WHERE booking_id = $26`,
       [
         customerName, contactPlatform  || 'mobile', contactNumber || customerPhone, contactPlatform2 || null, contactNumber2 || null,
         resolvedCategoryId,
         startDate, endDate, pickupTime || null,
         startLocation || null, endLocation || null,
+        pickupLat ?? null, pickupLng ?? null, dropoffLat ?? null, dropoffLng ?? null,
         totalDays    || 1, daysRequired || 1,
         luggage10kg  || 0, luggage25kg  || 0, luggage35kg || 0,
         noOfAdults   || 1, noOfChildren || 0, agesOfChildren || null,

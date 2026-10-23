@@ -20,7 +20,7 @@ const DetailRow = ({ icon: Icon, label, value }) =>
       </div>
       <div>
         <p className="text-xs text-slate-400 font-medium">{label}</p>
-        <p className="text-sm font-semibold text-slate-800 mt-0.5">{value}</p>
+        <div className="text-sm font-semibold text-slate-800 mt-0.5">{value}</div>
       </div>
     </div>
   ) : null;
@@ -238,8 +238,38 @@ const MyBookingDetail = ({ booking, onBack }) => {
         <Section title="Trip Details">
           {booking.tourType === "P2P" && (
             <>
-              <DetailRow icon={MapPin} label="Pickup Location"   value={booking.startLocation || booking.pickupLocation} />
-              <DetailRow icon={MapPin} label="Drop-off Location" value={booking.endLocation || booking.dropoffLocation} />
+              <DetailRow
+                icon={MapPin}
+                label="Pickup Location"
+                value={
+                  booking.startLocation || booking.pickupLocation ? (
+                    <span className="flex items-center gap-2 flex-wrap">
+                      <span>{booking.startLocation || booking.pickupLocation}</span>
+                      {booking.pickupLat != null && booking.pickupLng != null && (
+                        <span className="text-[10px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                          GPS: {Number(booking.pickupLat).toFixed(4)}°, {Number(booking.pickupLng).toFixed(4)}°
+                        </span>
+                      )}
+                    </span>
+                  ) : null
+                }
+              />
+              <DetailRow
+                icon={MapPin}
+                label="Drop-off Location"
+                value={
+                  booking.endLocation || booking.dropoffLocation ? (
+                    <span className="flex items-center gap-2 flex-wrap">
+                      <span>{booking.endLocation || booking.dropoffLocation}</span>
+                      {booking.dropoffLat != null && booking.dropoffLng != null && (
+                        <span className="text-[10px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                          GPS: {Number(booking.dropoffLat).toFixed(4)}°, {Number(booking.dropoffLng).toFixed(4)}°
+                        </span>
+                      )}
+                    </span>
+                  ) : null
+                }
+              />
             </>
           )}
           <DetailRow icon={Calendar} label="Start Date"   value={booking.startDate} />

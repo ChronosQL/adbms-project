@@ -21,7 +21,7 @@ const ReviewRow = ({ icon: Icon, label, value }) =>
       </div>
       <div>
         <p className="text-xs text-[#6B7280] font-medium">{label}</p>
-        <p className="text-sm font-semibold text-[#2D3142] mt-0.5">{value}</p>
+        <div className="text-sm font-semibold text-[#2D3142] mt-0.5">{value}</div>
       </div>
     </div>
   ) : null;
@@ -60,8 +60,38 @@ const P2PReviewStep = ({ data }) => {
 
       {/* ── Trip Details ── */}
       <Section title="Trip Details">
-        <ReviewRow icon={MapPin}   label="Pickup Location"   value={data.startLocation} />
-        <ReviewRow icon={MapPin}   label="Drop-off Location" value={data.endLocation} />
+        <ReviewRow
+          icon={MapPin}
+          label="Pickup Location"
+          value={
+            data.startLocation ? (
+              <span className="flex items-center gap-2 flex-wrap">
+                <span>{data.startLocation}</span>
+                {data.pickupLat != null && data.pickupLng != null && (
+                  <span className="text-[10px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                    GPS: {Number(data.pickupLat).toFixed(4)}°, {Number(data.pickupLng).toFixed(4)}°
+                  </span>
+                )}
+              </span>
+            ) : null
+          }
+        />
+        <ReviewRow
+          icon={MapPin}
+          label="Drop-off Location"
+          value={
+            data.endLocation ? (
+              <span className="flex items-center gap-2 flex-wrap">
+                <span>{data.endLocation}</span>
+                {data.dropoffLat != null && data.dropoffLng != null && (
+                  <span className="text-[10px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                    GPS: {Number(data.dropoffLat).toFixed(4)}°, {Number(data.dropoffLng).toFixed(4)}°
+                  </span>
+                )}
+              </span>
+            ) : null
+          }
+        />
         <ReviewRow icon={Calendar} label="Travel Date"       value={`${data.startDate} → ${data.endDate}`} />
         <ReviewRow icon={Clock}    label="Pickup Time"       value={data.pickupTime} />
         <ReviewRow icon={Calendar} label="Total Days"        value={`${data.totalDays} day(s)`} />

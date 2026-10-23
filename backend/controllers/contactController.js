@@ -45,13 +45,33 @@ const submitInquiry = async (req, res) => {
 const getAllInquiries = async (req, res) => {
   const { page, limit, offset, buildPagination } = parsePagination(req.query, 10, 100);
   const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
+  const { search, status, unreadOnly } = req.query;
 
   try {
-    let sql = `SELECT *, COUNT(*) OVER()::integer AS total_count FROM contact_inquiry ORDER BY submitted_at DESC`;
+    const whereClauses = [];
     const params = [];
+
+    if (search && search.trim()) {
+      const s = `%${search.trim()}%`;
+      params.push(s);
+      whereClauses.push(`(sender_name ILIKE $${params.length} OR sender_email ILIKE $${params.length} OR subject ILIKE $${params.length} OR message ILIKE $${params.length})`);
+    }
+
+    if (status && status !== 'all') {
+      params.push(status.toLowerCase());
+      whereClauses.push(`LOWER(status) = $${params.length}`);
+    }
+
+    if (unreadOnly === 'true' || unreadOnly === true) {
+      whereClauses.push(`is_read = FALSE`);
+    }
+
+    const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    let sql = `SELECT *, COUNT(*) OVER()::integer AS total_count FROM contact_inquiry ${whereSql} ORDER BY submitted_at DESC`;
     if (isPaginated) {
-      sql += ` LIMIT $1 OFFSET $2`;
       params.push(limit, offset);
+      sql += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
     }
 
     const { rows: inquiries } = await db.query(sql, params);

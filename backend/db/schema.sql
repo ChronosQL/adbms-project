@@ -280,6 +280,12 @@ CREATE TABLE booking (
     pickup_time TIME,
     start_location VARCHAR(100),
     end_location VARCHAR(100),
+    pickup_lat NUMERIC(10, 7) NULL,
+    pickup_lng NUMERIC(10, 7) NULL,
+    pickup_geom GEOMETRY(Point, 4326) NULL,
+    dropoff_lat NUMERIC(10, 7) NULL,
+    dropoff_lng NUMERIC(10, 7) NULL,
+    dropoff_geom GEOMETRY(Point, 4326) NULL,
 
     -- Days
     total_days INTEGER NOT NULL,
@@ -316,6 +322,37 @@ CREATE TABLE booking (
     CONSTRAINT fk_booking_category FOREIGN KEY (category_id) REFERENCES vehicle_category(category_id),
     CONSTRAINT fk_booking_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehicle(vehicle_id)
 );
+
+-- Spatial GIST indexes for booking
+CREATE INDEX IF NOT EXISTS idx_booking_pickup_geom ON booking USING GIST (pickup_geom);
+CREATE INDEX IF NOT EXISTS idx_booking_dropoff_geom ON booking USING GIST (dropoff_geom);
+
+-- PostGIS synchronization trigger function for booking
+DROP FUNCTION IF EXISTS set_booking_geoms() CASCADE;
+CREATE OR REPLACE FUNCTION set_booking_geoms()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.pickup_lng IS NOT NULL AND NEW.pickup_lat IS NOT NULL THEN
+        NEW.pickup_geom := ST_SetSRID(ST_MakePoint(NEW.pickup_lng, NEW.pickup_lat), 4326);
+    ELSE
+        NEW.pickup_geom := NULL;
+    END IF;
+
+    IF NEW.dropoff_lng IS NOT NULL AND NEW.dropoff_lat IS NOT NULL THEN
+        NEW.dropoff_geom := ST_SetSRID(ST_MakePoint(NEW.dropoff_lng, NEW.dropoff_lat), 4326);
+    ELSE
+        NEW.dropoff_geom := NULL;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_booking_geoms ON booking CASCADE;
+CREATE TRIGGER trg_booking_geoms
+BEFORE INSERT OR UPDATE ON booking
+FOR EACH ROW
+EXECUTE FUNCTION set_booking_geoms();
 
 DROP TABLE IF EXISTS booking_package CASCADE;
 CREATE TABLE booking_package (

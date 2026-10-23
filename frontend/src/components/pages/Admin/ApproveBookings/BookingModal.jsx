@@ -316,8 +316,38 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
           <div style={{ background: card, borderRadius: 14, padding: "4px 16px", border: `1px solid ${border}`, marginBottom: 16 }}>
             {booking.tourType === "P2P" && (
               <>
-                <Row icon={MapPin} label="Pickup Location"   value={booking.pickupLocation || booking.startLocation} />
-                <Row icon={MapPin} label="Drop-off Location" value={booking.dropoffLocation || booking.endLocation} />
+                <Row
+                  icon={MapPin}
+                  label="Pickup Location"
+                  value={
+                    booking.pickupLocation || booking.startLocation ? (
+                      <span>
+                        {booking.pickupLocation || booking.startLocation}
+                        {booking.pickupLat != null && booking.pickupLng != null && (
+                          <span style={{ marginLeft: 8, fontSize: 11, color: "#2F9E44", fontWeight: 700 }}>
+                            ({Number(booking.pickupLat).toFixed(4)}°, {Number(booking.pickupLng).toFixed(4)}°)
+                          </span>
+                        )}
+                      </span>
+                    ) : null
+                  }
+                />
+                <Row
+                  icon={MapPin}
+                  label="Drop-off Location"
+                  value={
+                    booking.dropoffLocation || booking.endLocation ? (
+                      <span>
+                        {booking.dropoffLocation || booking.endLocation}
+                        {booking.dropoffLat != null && booking.dropoffLng != null && (
+                          <span style={{ marginLeft: 8, fontSize: 11, color: "#2F9E44", fontWeight: 700 }}>
+                            ({Number(booking.dropoffLat).toFixed(4)}°, {Number(booking.dropoffLng).toFixed(4)}°)
+                          </span>
+                        )}
+                      </span>
+                    ) : null
+                  }
+                />
               </>
             )}
             {booking.tourType === "PACKAGE" && (
@@ -389,7 +419,31 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
           )}
 
           {/* ── Quote + vehicle assignment (PENDING or QUOTED) ── */}
-          {(booking.status === "PENDING" || booking.status === "QUOTED") && (
+          {booking.status === "QUOTED" && (
+            <div style={{ background: dark ? "rgba(99,102,241,0.07)" : "rgba(99,102,241,0.04)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#6366f1" }}>Official Quote Provided</p>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "rgba(99,102,241,0.15)", color: "#6366f1" }}>FINAL QUOTE LOCKED</span>
+              </div>
+              <p style={{ margin: "0 0 12px", fontSize: 12, color: ts }}>
+                This quote has been locked and communicated to the customer. Awaiting customer acceptance or decline.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: card, padding: 12, borderRadius: 12, border: `1px solid ${border}` }}>
+                <div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: ts, textTransform: "uppercase" }}>Quoted Price</span>
+                  <p style={{ margin: "2px 0 0", fontSize: 15, fontWeight: 800, color: "#6366f1" }}>${booking.quotedPrice}</p>
+                </div>
+                <div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: ts, textTransform: "uppercase" }}>Assigned Vehicle</span>
+                  <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: tm }}>
+                    {booking.assignedVehicle?.name || booking.categoryName || "Assigned"} ({booking.assignedVehicle?.plateNumber || "—"})
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {booking.status === "PENDING" && (
             <div style={{ background: dark ? "rgba(99,102,241,0.07)" : "rgba(99,102,241,0.04)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
               <p style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 800, color: "#6366f1" }}>Set Price & Assign Vehicle</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -458,12 +512,6 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
               <button onClick={handleSendQuote} style={{ width: "100%", background: "#6366f1", color: "white", border: "none", borderRadius: 12, padding: 12, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
                 📨 Send Quote to Customer
               </button>
-              {booking.quotedPrice && (
-                <p style={{ margin: "8px 0 0", fontSize: 12, color: ts, textAlign: "center" }}>
-                  Current quote: <strong style={{ color: "#6366f1" }}>${booking.quotedPrice}</strong>
-                  {booking.assignedVehicle && ` · ${booking.assignedVehicle.name} (${booking.assignedVehicle.plateNumber})`}
-                </p>
-              )}
             </div>
           )}
 
