@@ -313,11 +313,6 @@ CREATE TABLE payment (
     CONSTRAINT fk_payment_user FOREIGN KEY (recorded_by) REFERENCES "user"(user_id)
 );
 
-CREATE TABLE city (
-    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL
-);
-
 -- =========================================================
 -- Reviews
 -- =========================================================
@@ -376,25 +371,4 @@ CREATE TABLE contact_reply (
     CONSTRAINT fk_reply_inquiry FOREIGN KEY (inquiry_id) REFERENCES contact_inquiry(inquiry_id)
         ON DELETE CASCADE
         ON UPDATE CASCADE
-);
-
--- =========================================================
--- Chat System
--- =========================================================
-CREATE TABLE chat_topic (
-    topic_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    subject VARCHAR(100),
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_chat_topic_user FOREIGN KEY (user_id) REFERENCES "user"(user_id)
-);
-
-CREATE TABLE chat_message (
-    message_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    topic_id INTEGER NOT NULL,
-    sender_id INTEGER NOT NULL,
-    message TEXT NOT NULL,
-    sent_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_chat_message_topic FOREIGN KEY (topic_id) REFERENCES chat_topic(topic_id),
-    CONSTRAINT fk_chat_message_sender FOREIGN KEY (sender_id) REFERENCES "user"(user_id)
 );

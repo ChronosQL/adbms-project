@@ -193,9 +193,8 @@ const createP2PBooking = async (req, res) => {
          total_days, days_required,
          luggage_10kg, luggage_25kg, luggage_35kg,
          no_of_adults, no_of_children, ages_of_children,
-         notes, tour_thoughts,
-         booking_status, booking_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'PENDING', CURRENT_DATE)
+         notes, tour_thoughts)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
        RETURNING booking_id`,
       [
         req.user.id,
