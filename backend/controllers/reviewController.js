@@ -82,7 +82,7 @@ const getPublishedReviews = async (_req, res) => {
         u.email AS customer_email,
         u.country AS customer_country,
         b.tour_type,
-        COALESCE(p.title, b.tour_type) AS tour_title
+        COALESCE(p.title, b.tour_type::TEXT) AS tour_title
       FROM review r
       INNER JOIN "user" u ON u.user_id = r.user_id
       INNER JOIN booking b ON b.booking_id = r.booking_id
