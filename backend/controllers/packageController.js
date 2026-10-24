@@ -159,17 +159,23 @@ exports.createPackage = async (req, res) => {
       for (let i = 0; i < destinations.length; i++) {
         const dest = destinations[i] || {};
         const destImage = await uploadBufferToCloudinary(destFiles[i], 'package_uploads') || dest.image || null;
+        const lat = (dest.latitude !== undefined && dest.latitude !== null && dest.latitude !== '')
+          ? parseFloat(dest.latitude)
+          : ((dest.lat !== undefined && dest.lat !== null && dest.lat !== '') ? parseFloat(dest.lat) : null);
+        const lng = (dest.longitude !== undefined && dest.longitude !== null && dest.longitude !== '')
+          ? parseFloat(dest.longitude)
+          : ((dest.lng !== undefined && dest.lng !== null && dest.lng !== '') ? parseFloat(dest.lng) : null);
 
         const { rows: placeRows } = await client.query(
-          `INSERT INTO place (place_name, image_url, description) VALUES ($1, $2, $3) RETURNING place_id`,
-          [dest.name || null, destImage, dest.description || null]
+          `INSERT INTO place (place_name, image_url, description, latitude, longitude) VALUES ($1, $2, $3, $4, $5) RETURNING place_id`,
+          [dest.name || null, destImage, dest.description || null, lat, lng]
         );
         const placeId = placeRows[0].place_id;
 
         const dayNumber = dest.dayNumber || (i + 1);
         await client.query(
-          `INSERT INTO package_place (package_id, place_id, day_number) VALUES ($1, $2, $3)`,
-          [packageId, placeId, dayNumber]
+          `INSERT INTO package_place (package_id, place_id, day_number, latitude, longitude) VALUES ($1, $2, $3, $4, $5)`,
+          [packageId, placeId, dayNumber, lat, lng]
         );
 
         const activities = Array.isArray(dest.activities) ? dest.activities : [];
@@ -230,7 +236,9 @@ exports.listAdminPackages = async (req, res) => {
 
     if (packageIds.length > 0) {
       const { rows: places } = await db.query(`
-        SELECT pp.package_id, pl.place_id, pl.place_name, pl.image_url, pl.description, pp.day_number
+        SELECT pp.package_id, pl.place_id, pl.place_name, pl.image_url, pl.description, pp.day_number,
+               COALESCE(pp.latitude, pl.latitude) AS latitude,
+               COALESCE(pp.longitude, pl.longitude) AS longitude
         FROM package_place pp
         INNER JOIN place pl ON pl.place_id = pp.place_id
         WHERE pp.package_id = ANY($1)
@@ -245,6 +253,8 @@ exports.listAdminPackages = async (req, res) => {
           description: item.description,
           image: item.image_url,
           days: item.day_number,
+          latitude: item.latitude !== null && item.latitude !== undefined ? parseFloat(item.latitude) : null,
+          longitude: item.longitude !== null && item.longitude !== undefined ? parseFloat(item.longitude) : null,
         });
         return acc;
       }, {});
@@ -364,7 +374,9 @@ exports.listPublicPackages = async (req, res) => {
     let placeCountByPkg = {};
     if (packageIds.length > 0) {
       const { rows: places } = await db.query(`
-        SELECT pp.package_id, pl.place_name, pl.image_url, pp.day_number
+        SELECT pp.package_id, pl.place_name, pl.image_url, pp.day_number,
+               COALESCE(pp.latitude, pl.latitude) AS latitude,
+               COALESCE(pp.longitude, pl.longitude) AS longitude
         FROM package_place pp
         INNER JOIN place pl ON pl.place_id = pp.place_id
         WHERE pp.package_id = ANY($1)
@@ -376,7 +388,13 @@ exports.listPublicPackages = async (req, res) => {
       }, {});
       placesByPkg = places.reduce((acc, p) => {
         acc[p.package_id] = acc[p.package_id] || [];
-        if (acc[p.package_id].length < 2) acc[p.package_id].push({ name: p.place_name, image: p.image_url, dayNumber: p.day_number });
+        if (acc[p.package_id].length < 2) acc[p.package_id].push({
+          name: p.place_name,
+          image: p.image_url,
+          dayNumber: p.day_number,
+          latitude: p.latitude !== null && p.latitude !== undefined ? parseFloat(p.latitude) : null,
+          longitude: p.longitude !== null && p.longitude !== undefined ? parseFloat(p.longitude) : null,
+        });
         return acc;
       }, {});
     }
@@ -435,7 +453,9 @@ exports.getPackageDetail = async (req, res) => {
     const pkgRow = rows[0];
 
     const { rows: places } = await db.query(`
-      SELECT pl.place_id, pl.place_name, pl.image_url, pl.description, pp.day_number
+      SELECT pl.place_id, pl.place_name, pl.image_url, pl.description, pp.day_number,
+             COALESCE(pp.latitude, pl.latitude) AS latitude,
+             COALESCE(pp.longitude, pl.longitude) AS longitude
       FROM package_place pp
       INNER JOIN place pl ON pl.place_id = pp.place_id
       WHERE pp.package_id = $1
@@ -467,6 +487,8 @@ exports.getPackageDetail = async (req, res) => {
       image: p.image_url,
       description: p.description,
       dayNumber: p.day_number,
+      latitude: p.latitude !== null && p.latitude !== undefined ? parseFloat(p.latitude) : null,
+      longitude: p.longitude !== null && p.longitude !== undefined ? parseFloat(p.longitude) : null,
       activities: activitiesByPlace[p.place_id] || []
     }));
 
@@ -649,17 +671,23 @@ exports.updatePackage = async (req, res) => {
       for (let i = 0; i < destinations.length; i++) {
         const dest = destinations[i] || {};
         const destImage = await uploadBufferToCloudinary(destFiles[i], 'package_uploads') || dest.image || null;
+        const lat = (dest.latitude !== undefined && dest.latitude !== null && dest.latitude !== '')
+          ? parseFloat(dest.latitude)
+          : ((dest.lat !== undefined && dest.lat !== null && dest.lat !== '') ? parseFloat(dest.lat) : null);
+        const lng = (dest.longitude !== undefined && dest.longitude !== null && dest.longitude !== '')
+          ? parseFloat(dest.longitude)
+          : ((dest.lng !== undefined && dest.lng !== null && dest.lng !== '') ? parseFloat(dest.lng) : null);
 
         const { rows: placeRows } = await client.query(
-          `INSERT INTO place (place_name, image_url, description) VALUES ($1, $2, $3) RETURNING place_id`,
-          [dest.name || null, destImage, dest.description || null]
+          `INSERT INTO place (place_name, image_url, description, latitude, longitude) VALUES ($1, $2, $3, $4, $5) RETURNING place_id`,
+          [dest.name || null, destImage, dest.description || null, lat, lng]
         );
         const placeId = placeRows[0].place_id;
 
         const dayNumber = dest.dayNumber || (i + 1);
         await client.query(
-          `INSERT INTO package_place (package_id, place_id, day_number) VALUES ($1, $2, $3)`,
-          [id, placeId, dayNumber]
+          `INSERT INTO package_place (package_id, place_id, day_number, latitude, longitude) VALUES ($1, $2, $3, $4, $5)`,
+          [id, placeId, dayNumber, lat, lng]
         );
 
         const activities = Array.isArray(dest.activities) ? dest.activities : [];

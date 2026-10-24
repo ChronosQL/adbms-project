@@ -254,9 +254,34 @@ CREATE TABLE package_place (
     package_id INTEGER NOT NULL,
     place_id INTEGER NOT NULL,
     day_number INTEGER NOT NULL,
+    latitude NUMERIC(10, 7),
+    longitude NUMERIC(10, 7),
+    geom GEOMETRY(Point, 4326),
     CONSTRAINT fk_package_place_package FOREIGN KEY (package_id) REFERENCES package(package_id),
     CONSTRAINT fk_package_place_place FOREIGN KEY (place_id) REFERENCES place(place_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_package_place_geom ON package_place USING GIST (geom);
+
+CREATE OR REPLACE FUNCTION set_package_place_geom()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+        IF NEW.longitude IS NOT NULL AND NEW.latitude IS NOT NULL THEN
+            NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
+        ELSE
+            NEW.geom := NULL;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_package_place_geom ON package_place;
+CREATE TRIGGER trg_package_place_geom
+BEFORE INSERT OR UPDATE ON package_place
+FOR EACH ROW
+EXECUTE FUNCTION set_package_place_geom();
 
 -- =========================================================
 -- Bookings & Payments

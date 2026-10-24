@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { buildApiUrl } from "../../../../config/api";
 import {
-  getWeatherInfo, parseForecast, formatHour, loadLocationWeather,
+  getWeatherInfo, parseForecast, formatHour, loadLocationWeather, fetchForecast,
 } from "../../../../services/weatherService";
 
 const HourlyForecastTable = ({ days }) => {
@@ -114,7 +114,16 @@ const BookingWeatherPanel = ({ booking }) => {
       const results = await Promise.all(
         destinations.map(async (place) => {
           try {
-            const { displayName, weatherData } = await loadLocationWeather(place.name);
+            let displayName = place.name;
+            let weatherData = null;
+            if (place.latitude != null && place.longitude != null) {
+              weatherData = await fetchForecast(place.latitude, place.longitude);
+              displayName = `${place.name}, Sri Lanka`;
+            } else {
+              const res = await loadLocationWeather(place.name);
+              displayName = res.displayName;
+              weatherData = res.weatherData;
+            }
             return {
               placeId: place.id,
               displayName,

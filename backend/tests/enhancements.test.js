@@ -126,6 +126,58 @@ test('Enhancements: packageController supports server-side pagination', () => {
   );
 });
 
+test('Enhancements: package_place coordinates schema synchronicity', () => {
+  const schemaContent = fs.readFileSync(SCHEMA_FILE, 'utf-8');
+  const initContent = fs.readFileSync(INIT_FILE, 'utf-8');
+
+  const requiredFields = [
+    'latitude NUMERIC(10, 7)',
+    'longitude NUMERIC(10, 7)',
+    'idx_package_place_geom',
+    'set_package_place_geom()',
+    'trg_package_place_geom',
+  ];
+
+  for (const field of requiredFields) {
+    assert.ok(
+      schemaContent.includes(field),
+      `schema.sql must contain '${field}' for package_place coordinates.`
+    );
+    assert.ok(
+      initContent.includes(field),
+      `init.sql must contain '${field}' for package_place coordinates.`
+    );
+  }
+});
+
+test('Enhancements: Database connection verifies coordinates columns on package_place table', async () => {
+  const { rows } = await db.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'package_place' AND column_name IN (
+      'latitude', 'longitude', 'geom'
+    )
+  `);
+
+  const foundCols = rows.map(r => r.column_name);
+  assert.equal(foundCols.length, 3, 'All 3 spatial columns (latitude, longitude, geom) must exist on package_place.');
+});
+
+test('Enhancements: packageController writes and reads package_place coordinates', () => {
+  const code = fs.readFileSync(PACKAGE_CONTROLLER, 'utf-8');
+
+  assert.ok(
+    code.includes('COALESCE(pp.latitude, pl.latitude) AS latitude') &&
+    code.includes('COALESCE(pp.longitude, pl.longitude) AS longitude'),
+    'packageController must select coordinates with package_place taking precedence over place.'
+  );
+
+  assert.ok(
+    code.includes('dest.latitude') && code.includes('dest.longitude'),
+    'packageController must insert dest.latitude and dest.longitude into package_place.'
+  );
+});
+
 test.after(async () => {
   await db.end();
 });

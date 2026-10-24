@@ -1,91 +1,78 @@
-import React, { useState } from "react";
+import React from "react";
+import { Search, ChevronDown } from "lucide-react";
+import { BRAND, FONT } from "../AdminDashboard/adminTheme";
 
 const TYPE_OPTIONS = [
   { value: "", label: "All Types" },
   { value: "deposit", label: "Deposit" },
   { value: "final", label: "Final" },
   { value: "full", label: "Full Payment" },
+  { value: "additional", label: "Additional Charges" },
 ];
 
-const STATUS_OPTIONS = [
-  { value: "", label: "All Statuses" },
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-];
-
-const DATE_OPTIONS = [
-  { value: "this_month", label: "This Month" },
-  { value: "last_month", label: "Last Month" },
-  { value: "last_3_months", label: "Last 3 Months" },
-  { value: "this_year", label: "This Year" },
-  { value: "all_time", label: "All Time" },
+const METHOD_OPTIONS = [
+  { value: "", label: "All Methods" },
+  { value: "cash", label: "Cash" },
+  { value: "bank_transfer", label: "Bank Transfer" },
 ];
 
 const TABS = [
   { key: "all", label: "All Payments", countKey: "all" },
-  { key: "pending", label: "Pending", countKey: "pending" },
+  { key: "pending", label: "Pending Verifications", countKey: "pending" },
   { key: "approved", label: "Approved", countKey: "approved" },
   { key: "rejected", label: "Rejected", countKey: "rejected" },
 ];
 
-const SelectIcon = () => (
-  <svg
-    className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{ color: "#6b7280" }}
-  >
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-);
-
 export default function PaymentFilters({
-  counts = { all: 35, pending: 5, approved: 28, rejected: 2 },
-  filters = { search: "", type: "", status: "", dateRange: "this_month" },
+  counts = { all: 0, pending: 0, approved: 0, rejected: 0 },
+  filters = { search: "", type: "", method: "" },
   onFilterChange = () => {},
   activeTab = "all",
   onTabChange = () => {},
 }) {
   return (
-    <div className="mb-5">
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+    <div className="mb-6 space-y-4">
+      {/* ── Search and dropdown filters ── */}
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 min-w-0">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ color: "#9ca3af" }}
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+          <Search
+            size={16}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
+          />
           <input
             type="text"
-            placeholder="Search by ID, customer, booking..."
+            placeholder="Search by Payment ID, Customer name, Booking ref, phone..."
             value={filters.search}
             onChange={(e) => onFilterChange("search", e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder-gray-400"
+            className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 transition-all"
           />
         </div>
 
+        {/* Method Filter */}
         <div className="relative">
           <select
-            value={filters.type}
+            value={filters.method || ""}
+            onChange={(e) => onFilterChange("method", e.target.value)}
+            className="appearance-none pl-3.5 pr-9 py-2.5 text-sm font-medium border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+          >
+            {METHOD_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={14}
+            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
+          />
+        </div>
+
+        {/* Type Filter */}
+        <div className="relative">
+          <select
+            value={filters.type || ""}
             onChange={(e) => onFilterChange("type", e.target.value)}
-            className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent cursor-pointer"
+            className="appearance-none pl-3.5 pr-9 py-2.5 text-sm font-medium border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
           >
             {TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -93,76 +80,32 @@ export default function PaymentFilters({
               </option>
             ))}
           </select>
-          <SelectIcon />
-        </div>
-
-        <div className="relative">
-          <select
-            value={filters.status}
-            onChange={(e) => onFilterChange("status", e.target.value)}
-            className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent cursor-pointer"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <SelectIcon />
-        </div>
-
-        <div className="relative">
-          <svg
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ color: "#6b7280" }}
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
-          <select
-            value={filters.dateRange}
-            onChange={(e) => onFilterChange("dateRange", e.target.value)}
-            className="appearance-none pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent cursor-pointer"
-          >
-            {DATE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <SelectIcon />
+          <ChevronDown
+            size={14}
+            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
+          />
         </div>
       </div>
 
+      {/* ── Status Tabs ── */}
       <div className="flex items-center gap-2 flex-wrap">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
           return (
             <button
               key={tab.key}
+              type="button"
               onClick={() => onTabChange(tab.key)}
-              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 isActive
-                  ? "bg-teal-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-[#EF8354] text-white shadow-sm"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
               }`}
             >
-              {tab.label}
+              <span>{tab.label}</span>
               <span
-                className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
-                  isActive
-                    ? "bg-white/20 text-white"
-                    : "bg-white text-gray-500"
+                className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                  isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
                 }`}
               >
                 {counts[tab.countKey] ?? 0}

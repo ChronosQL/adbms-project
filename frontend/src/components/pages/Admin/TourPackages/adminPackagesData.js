@@ -40,6 +40,8 @@ const mapBackendPackage = (p) => ({
   destinations: Array.isArray(p.destinations) ? p.destinations.map(d => ({
     ...d,
     days: d.dayNumber || d.days || 1,
+    latitude: d.latitude != null ? parseFloat(d.latitude) : null,
+    longitude: d.longitude != null ? parseFloat(d.longitude) : null,
     activities: (d.activities || []).map(a => ({
       name: a.activity_name || a.name || '',
       phone: a.phone || '',
@@ -117,6 +119,8 @@ export const packageStore = {
           description: d.description,
           dayNumber: d.days || (i + 1),
           activities: d.activities || [],
+          latitude: d.latitude != null ? parseFloat(d.latitude) : (d.lat != null ? parseFloat(d.lat) : null),
+          longitude: d.longitude != null ? parseFloat(d.longitude) : (d.lng != null ? parseFloat(d.lng) : null),
         };
       });
 
@@ -205,6 +209,8 @@ export const packageStore = {
           description: d.description,
           dayNumber: d.days || (i + 1),
           activities: d.activities || [],
+          latitude: d.latitude != null ? parseFloat(d.latitude) : (d.lat != null ? parseFloat(d.lat) : null),
+          longitude: d.longitude != null ? parseFloat(d.longitude) : (d.lng != null ? parseFloat(d.lng) : null),
         };
       });
       form.append('destinations', JSON.stringify(dests));
@@ -320,6 +326,6 @@ export const emptyPackage = () => ({
   image:        '',
   highlights:   ['', '', '', ''],
   destinations: [
-    { name: '', days: 1, description: '', image: '', imageFile: null, activities: [] },
+    { name: '', days: 1, description: '', image: '', imageFile: null, latitude: null, longitude: null, activities: [] },
   ],
 });

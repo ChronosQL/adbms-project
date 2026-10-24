@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PACKAGE_TYPES, PACKAGE_DAYS, emptyPackage } from './adminPackagesData';
+import { searchLocations } from '../../../../services/locationService';
 
 // ── Small field components ───────────────────────────────────
 const Field = ({ label, error, children, dark = false }) => (
@@ -28,16 +29,186 @@ const taStyle = (error, dark = false) => ({
   resize: 'vertical', minHeight: '80px', lineHeight: 1.7, fontWeight: 300,
 });
 
+// ── Destination Location Autocomplete Field ──────────────────
+const DestinationLocationInput = ({ value, onChangeLocation, hasError = false, dark = false }) => {
+  const [query, setQuery] = useState(value || '');
+  const [results, setResults] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const dropdownRef = useRef(null);
+  const debounceTimer = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    onChangeLocation(val, null);
+
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
+    if (!val.trim()) {
+      setResults([]);
+      setIsOpen(false);
+      return;
+    }
+
+    debounceTimer.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const matches = await searchLocations(val);
+        setResults(matches || []);
+        setIsOpen((matches || []).length > 0);
+      } catch (err) {
+        console.warn('Failed to search locations:', err);
+      } finally {
+        setLoading(false);
+      }
+    }, 280);
+  };
+
+  const handleSelect = (loc) => {
+    const selectedName = loc.shortName || loc.label.split(',')[0] || loc.label;
+    setQuery(selectedName);
+    onChangeLocation(selectedName, { lat: loc.lat, lng: loc.lng });
+    setIsOpen(false);
+    setResults([]);
+  };
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <input
+          style={{
+            ...inputStyle(hasError, dark),
+            paddingRight: loading ? '32px' : '14px',
+          }}
+          placeholder="Search destination (e.g. Galle, Kandy, Sigiriya...)"
+          value={query}
+          onChange={handleInputChange}
+          onFocus={async () => {
+            if (results.length > 0) {
+              setIsOpen(true);
+            } else if (query.trim()) {
+              setLoading(true);
+              try {
+                const matches = await searchLocations(query.trim());
+                setResults(matches || []);
+                setIsOpen((matches || []).length > 0);
+              } finally {
+                setLoading(false);
+              }
+            }
+          }}
+        />
+        {loading && (
+          <div style={{
+            position: 'absolute', right: '10px',
+            width: '14px', height: '14px',
+            border: '2px solid rgba(0, 176, 165, 0.25)',
+            borderTopColor: '#00b0a5',
+            borderRadius: '50%',
+            animation: 'apfm-spin 0.8s linear infinite',
+          }} />
+        )}
+      </div>
+
+      {isOpen && results.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0,
+          marginTop: '4px', zIndex: 100,
+          maxHeight: '220px', overflowY: 'auto',
+          background: dark ? '#0f172a' : '#ffffff',
+          border: dark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,176,165,0.25)',
+          borderRadius: '10px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+        }}>
+          {results.map((loc, idx) => (
+            <div
+              key={idx}
+              onClick={() => handleSelect(loc)}
+              style={{
+                padding: '9px 12px',
+                cursor: 'pointer',
+                borderBottom: idx < results.length - 1 ? (dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.05)') : 'none',
+                display: 'flex', flexDirection: 'column', gap: '2px',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,176,165,0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <div style={{
+                fontSize: '13px', fontWeight: 600,
+                color: dark ? '#f1f5f9' : '#0d2b2b',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span>{loc.label}</span>
+                {loc.category && (
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    color: '#00b0a5',
+                    background: 'rgba(0,176,165,0.1)',
+                    padding: '1px 6px', borderRadius: '4px',
+                  }}>
+                    {loc.category}
+                  </span>
+                )}
+              </div>
+              {loc.lat != null && loc.lng != null && (
+                <div style={{ fontSize: '11px', color: dark ? '#94a3b8' : '#64748b' }}>
+                  GPS: {Number(loc.lat).toFixed(4)}°, {Number(loc.lng).toFixed(4)}°
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Destination row ──────────────────────────────────────────
-const DestRow = ({ dest, index, onChange, onRemove, canRemove, dark = false, errors = {} }) => (
+const DestRow = ({ dest, index, onChange, onLocationChange, onRemove, canRemove, dark = false, errors = {} }) => (
   <div style={{
     background: dark ? '#0b1220' : '#f7fffe', border: dark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,176,165,0.15)',
     borderRadius: '12px', padding: '16px', display:'flex', flexDirection:'column', gap:'10px',
   }}>
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-      <span style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.18em', textTransform:'uppercase', color:'#00b0a5' }}>
-        Stop {index + 1}
-      </span>
+      <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+        <span style={{ fontSize:'10px', fontWeight:800, letterSpacing:'0.18em', textTransform:'uppercase', color:'#00b0a5' }}>
+          Stop {index + 1}
+        </span>
+        {dest.latitude != null && dest.longitude != null && (
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            color: '#00b0a5',
+            background: 'rgba(0,176,165,0.08)',
+            border: '1px solid rgba(0,176,165,0.25)',
+            padding: '2px 8px',
+            borderRadius: '999px',
+          }}>
+            GPS: {Number(dest.latitude).toFixed(3)}°, {Number(dest.longitude).toFixed(3)}°
+          </span>
+        )}
+      </div>
       {canRemove && (
         <button
           onClick={() => onRemove(index)}
@@ -51,12 +222,12 @@ const DestRow = ({ dest, index, onChange, onRemove, canRemove, dark = false, err
       )}
     </div>
     <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'10px' }}>
-        <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
-          <input
-            style={inputStyle(!!errors.name, dark)}
-          placeholder="Destination name"
+      <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
+        <DestinationLocationInput
           value={dest.name}
-          onChange={e => onChange(index, 'name', e.target.value)}
+          onChangeLocation={(name, coords) => onLocationChange(index, name, coords)}
+          hasError={!!errors.name}
+          dark={dark}
         />
         {errors.name && <span style={{ fontSize:'11px', color:'#cc3344', fontWeight:600 }}>{errors.name}</span>}
       </div>
@@ -182,7 +353,19 @@ const AdminPackageFormModal = ({ isOpen, pkg, onSave, onClose, dark = false, exi
     const dests = form.destinations.map((d, idx) => idx === i ? { ...d, [key]: val } : d);
     set('destinations', dests);
   };
-  const addDest = () => set('destinations', [...form.destinations, { name:'', days:1, description:'', image:'', imageFile:null, activities:[] }]);
+  const setDestLocation = (i, name, coords) => {
+    const dests = form.destinations.map((d, idx) => {
+      if (idx !== i) return d;
+      return {
+        ...d,
+        name,
+        latitude: coords?.lat != null ? coords.lat : d.latitude,
+        longitude: coords?.lng != null ? coords.lng : d.longitude,
+      };
+    });
+    set('destinations', dests);
+  };
+  const addDest = () => set('destinations', [...form.destinations, { name:'', days:1, description:'', image:'', imageFile:null, latitude:null, longitude:null, activities:[] }]);
   const removeDest = (i) => set('destinations', form.destinations.filter((_, idx) => idx !== i));
 
   const validate = () => {
@@ -445,6 +628,9 @@ const AdminPackageFormModal = ({ isOpen, pkg, onSave, onClose, dark = false, exi
         /* 2-col grid */
         .apfm-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         @media(max-width:560px){ .apfm-2col { grid-template-columns: 1fr; } }
+        @keyframes apfm-spin {
+          to { transform: rotate(360deg); }
+        }
       `}</style>
 
       <AnimatePresence>
@@ -559,6 +745,7 @@ const AdminPackageFormModal = ({ isOpen, pkg, onSave, onClose, dark = false, exi
                       dest={dest}
                       index={i}
                       onChange={setDest}
+                      onLocationChange={setDestLocation}
                       onRemove={removeDest}
                       canRemove={form.destinations.length > 1}
                       dark={dark}

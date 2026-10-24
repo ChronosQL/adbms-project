@@ -87,7 +87,36 @@ export async function searchLocations(query, options = {}) {
     }
   }
 
-  // 2. Fallback: Search local curated registry
+  // 2. Try OpenStreetMap Photon Geocoder for Sri Lanka if Mapbox is unavailable
+  try {
+    const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&bbox=79.5,5.8,82.0,9.9&limit=8`;
+    const pRes = await fetch(photonUrl);
+    if (pRes.ok) {
+      const pData = await pRes.json();
+      const features = pData.features || [];
+      if (features.length > 0) {
+        const results = features.map(f => {
+          const props = f.properties || {};
+          const name = props.name || q;
+          const details = [props.city, props.state, props.country].filter(Boolean).join(', ');
+          const label = details ? `${name}, ${details}` : name;
+          return {
+            label,
+            shortName: name,
+            category: props.osm_value ? (props.osm_value.charAt(0).toUpperCase() + props.osm_value.slice(1)) : 'Location',
+            lat: f.geometry?.coordinates?.[1] ?? null,
+            lng: f.geometry?.coordinates?.[0] ?? null,
+          };
+        });
+        queryCache.set(cacheKey, results);
+        return results;
+      }
+    }
+  } catch (err) {
+    console.warn("[locationService] Photon lookup failed, falling back to local registry:", err);
+  }
+
+  // 3. Fallback: Search local curated registry
   const lowerQ = q.toLowerCase();
   const localMatches = SRI_LANKA_LOCATIONS.filter((loc) =>
     (loc.label || String(loc)).toLowerCase().includes(lowerQ)
