@@ -37,7 +37,7 @@ function resolveCategory(feature) {
  * @param {object} options - Optional parameters
  * @returns {Promise<Array<{ label: string, shortName: string, category: string, lat: number, lng: number }>>}
  */
-export async function searchLocations(query, options = {}) {
+export async function searchLocations(query, _options = {}) {
   const q = (query || "").trim();
 
   // If empty query, return top curated Sri Lanka transit and airport hubs

@@ -29,10 +29,11 @@ const getAllPayments = async (req, res) => {
              b.tour_type, b.quoted_price, b.additional_charges, b.start_date, b.end_date, b.customer_name, b.contact_number AS customer_phone,
              u.name AS recorded_by_name,
              c.email AS customer_email,
-             (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE booking_id = b.booking_id AND status = 'APPROVED') AS total_paid,
+             COALESCE(fs.total_paid, 0) AS total_paid,
              COUNT(*) OVER()::integer AS total_count
       FROM payment p
       JOIN booking b ON p.booking_id = b.booking_id
+      LEFT JOIN v_booking_financial_summary fs ON fs.booking_id = b.booking_id
       LEFT JOIN "user" u ON p.recorded_by = u.user_id
       JOIN "user" c ON b.user_id = c.user_id
       ORDER BY CASE p.status WHEN 'PENDING' THEN 0 WHEN 'APPROVED' THEN 1 WHEN 'REJECTED' THEN 2 ELSE 3 END, p.payment_id DESC
@@ -359,16 +360,11 @@ const recordPayment = async (req, res) => {
       });
     }
 
-    const basePrice = booking.quoted_price ? parseFloat(booking.quoted_price) : 0;
-    const additional = booking.additional_charges ? parseFloat(booking.additional_charges) : 0;
-    const totalPrice = basePrice + additional;
-
-    const { rows: sumRows } = await db.query(
-      "SELECT COALESCE(SUM(amount), 0) AS total_approved FROM payment WHERE booking_id = $1 AND status = 'APPROVED'",
+    const { rows: finRows } = await db.query(
+      'SELECT outstanding_balance FROM v_booking_financial_summary WHERE booking_id = $1',
       [booking_id]
     );
-    const approvedTotal = parseFloat(sumRows[0].total_approved);
-    const remainingBalance = Math.max(0, totalPrice - approvedTotal);
+    const remainingBalance = finRows.length ? parseFloat(finRows[0].outstanding_balance) : 0;
 
     if (amountNum > remainingBalance) {
       return res.status(400).json({
@@ -428,16 +424,11 @@ const uploadPaymentSlip = async (req, res) => {
       return res.status(400).json({ message: 'Cannot upload payment slip for a cancelled booking.' });
     }
 
-    const basePrice = booking.quoted_price ? parseFloat(booking.quoted_price) : 0;
-    const additional = booking.additional_charges ? parseFloat(booking.additional_charges) : 0;
-    const totalPrice = basePrice + additional;
-
-    const { rows: sumRows } = await db.query(
-      "SELECT COALESCE(SUM(amount), 0) AS total_approved FROM payment WHERE booking_id = $1 AND status = 'APPROVED'",
+    const { rows: finRows } = await db.query(
+      'SELECT outstanding_balance FROM v_booking_financial_summary WHERE booking_id = $1',
       [booking_id]
     );
-    const approvedTotal = parseFloat(sumRows[0].total_approved);
-    const remainingBalance = Math.max(0, totalPrice - approvedTotal);
+    const remainingBalance = finRows.length ? parseFloat(finRows[0].outstanding_balance) : 0;
 
     if (amountNum > remainingBalance) {
       return res.status(400).json({

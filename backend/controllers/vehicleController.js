@@ -934,3 +934,38 @@ exports.getStats = async (_req, res) => {
     res.status(500).json({ success: false, message: 'Failed to load vehicle statistics.' });
   }
 };
+
+exports.getAvailableVehicles = async (req, res) => {
+  const { categoryId, startDate, endDate } = req.query;
+  if (!startDate || !endDate) {
+    return res.status(400).json({ success: false, message: 'startDate and endDate are required query parameters (YYYY-MM-DD).' });
+  }
+
+  try {
+    const catId = categoryId ? parseInt(categoryId, 10) : null;
+    const { rows } = await db.query(
+      'SELECT * FROM fn_get_available_vehicles($1, $2::date, $3::date)',
+      [isNaN(catId) ? null : catId, startDate, endDate]
+    );
+
+    res.json({
+      success: true,
+      vehicles: rows.map((r) => ({
+        id: r.vehicle_id,
+        vehicleId: r.vehicle_id,
+        categoryName: r.category_name,
+        name: r.model_name,
+        modelName: r.model_name,
+        plateNumber: r.plate_number,
+        seats: r.adult_seats,
+        adultSeats: r.adult_seats,
+        pricePerDay: r.price_per_day ? parseFloat(r.price_per_day) : null,
+        mainImageUrl: r.main_image_url,
+      })),
+    });
+  } catch (error) {
+    console.error('getAvailableVehicles error:', error);
+    res.status(500).json({ success: false, message: 'Failed to load available vehicles.' });
+  }
+};
+

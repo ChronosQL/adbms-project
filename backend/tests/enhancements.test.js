@@ -178,7 +178,115 @@ test('Enhancements: packageController writes and reads package_place coordinates
   );
 });
 
+test('Enhancements: Migration 006 views, functions, triggers and constraints synchronicity in schema and init files', () => {
+  const schemaContent = fs.readFileSync(SCHEMA_FILE, 'utf-8');
+  const initContent = fs.readFileSync(INIT_FILE, 'utf-8');
+
+  const requiredObjects = [
+    'v_booking_details',
+    'v_booking_financial_summary',
+    'v_package_catalog',
+    'fn_get_available_vehicles',
+    'fn_get_places_nearby',
+    'chk_booking_dates_valid',
+    'idx_booking_pending',
+    'idx_payment_approved',
+    'trg_booking_milestones',
+    'trg_inquiry_on_reply',
+    'booking_status_history',
+    'trg_booking_status_history',
+  ];
+
+  for (const obj of requiredObjects) {
+    assert.ok(
+      schemaContent.includes(obj),
+      `schema.sql must contain '${obj}' from migration 006.`
+    );
+    assert.ok(
+      initContent.includes(obj),
+      `init.sql must contain '${obj}' from migration 006.`
+    );
+  }
+});
+
+test('Enhancements: Database connection executes canonical views cleanly', async () => {
+  const { rows: bookingRows } = await db.query('SELECT * FROM v_booking_details LIMIT 5');
+  assert.ok(Array.isArray(bookingRows), 'v_booking_details must return an array');
+
+  const { rows: finRows } = await db.query('SELECT * FROM v_booking_financial_summary LIMIT 5');
+  assert.ok(Array.isArray(finRows), 'v_booking_financial_summary must return an array');
+  if (finRows.length > 0) {
+    assert.ok('total_price' in finRows[0], 'v_booking_financial_summary must have total_price column');
+    assert.ok('outstanding_balance' in finRows[0], 'v_booking_financial_summary must have outstanding_balance column');
+    assert.ok('payment_status' in finRows[0], 'v_booking_financial_summary must have payment_status column');
+  }
+
+  const { rows: pkgRows } = await db.query('SELECT * FROM v_package_catalog LIMIT 5');
+  assert.ok(Array.isArray(pkgRows), 'v_package_catalog must return an array');
+  if (pkgRows.length > 0) {
+    assert.ok('destinations' in pkgRows[0], 'v_package_catalog must have destinations JSONB column');
+  }
+});
+
+test('Enhancements: Database connection executes intelligent functions', async () => {
+  const { rows: vehicleRows } = await db.query(
+    'SELECT * FROM fn_get_available_vehicles(NULL, $1::date, $2::date) LIMIT 5',
+    ['2026-11-01', '2026-11-05']
+  );
+  assert.ok(Array.isArray(vehicleRows), 'fn_get_available_vehicles must return an array');
+
+  const { rows: nearbyRows } = await db.query(
+    'SELECT * FROM fn_get_places_nearby($1, $2, $3) LIMIT 5',
+    [6.9271, 79.8612, 50]
+  );
+  assert.ok(Array.isArray(nearbyRows), 'fn_get_places_nearby must return an array');
+  if (nearbyRows.length > 0) {
+    assert.ok('distance_km' in nearbyRows[0], 'fn_get_places_nearby must return distance_km');
+  }
+});
+
+test('Enhancements: Modernized controllers utilize canonical views and functions', () => {
+  const bookingCode = fs.readFileSync(BOOKING_CONTROLLER, 'utf-8');
+  assert.ok(
+    bookingCode.includes('v_booking_details'),
+    'bookingController must query v_booking_details.'
+  );
+  assert.ok(
+    bookingCode.includes('v_booking_financial_summary'),
+    'bookingController must query v_booking_financial_summary.'
+  );
+
+  const packageCode = fs.readFileSync(PACKAGE_CONTROLLER, 'utf-8');
+  assert.ok(
+    packageCode.includes('v_package_catalog'),
+    'packageController must query v_package_catalog.'
+  );
+  assert.ok(
+    packageCode.includes('fn_get_places_nearby'),
+    'packageController must call fn_get_places_nearby.'
+  );
+
+  const paymentCode = fs.readFileSync(PAYMENT_CONTROLLER, 'utf-8');
+  assert.ok(
+    paymentCode.includes('v_booking_financial_summary'),
+    'paymentController must query v_booking_financial_summary.'
+  );
+
+  const vehicleCode = fs.readFileSync(path.join(BACKEND_DIR, 'controllers', 'vehicleController.js'), 'utf-8');
+  assert.ok(
+    vehicleCode.includes('fn_get_available_vehicles'),
+    'vehicleController must call fn_get_available_vehicles.'
+  );
+
+  const connCode = fs.readFileSync(path.join(BACKEND_DIR, 'db', 'connection.js'), 'utf-8');
+  assert.ok(
+    connCode.includes('statement_timeout: 5000'),
+    'connection.js must set statement_timeout: 5000.'
+  );
+});
+
 test.after(async () => {
   await db.end();
 });
+
 

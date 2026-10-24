@@ -270,17 +270,10 @@ const getMyBookings = async (req, res) => {
 
   try {
     let query = `
-      SELECT b.*, u.email, u.emergency_name, u.emergency_phone, u.emergency_relationship,
-             vc.category_name,
-             p.package_id, p.title AS package_name,
-             COUNT(*) OVER()::integer AS total_count
-      FROM booking b
-      JOIN "user" u ON u.user_id = b.user_id
-      LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-      LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-      LEFT JOIN package p ON p.package_id = bp.package_id
-      WHERE b.user_id = $1
-      ORDER BY b.booking_date DESC, b.booking_id DESC
+      SELECT *, COUNT(*) OVER()::integer AS total_count
+      FROM v_booking_details
+      WHERE user_id = $1
+      ORDER BY booking_date DESC, booking_id DESC
     `;
     const params = [req.user.id];
 
@@ -309,18 +302,9 @@ const getAllBookings = async (req, res) => {
 
   try {
     let query = `
-      SELECT b.*, u.email, u.emergency_name, u.emergency_phone, u.emergency_relationship,
-             vc.category_name,
-             p.package_id, p.title AS package_name,
-             v.vehicle_number, v.name AS vehicle_name,
-             COUNT(*) OVER()::integer AS total_count
-      FROM booking b
-      JOIN "user" u ON u.user_id = b.user_id
-      LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-      LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-      LEFT JOIN package p ON p.package_id = bp.package_id
-      LEFT JOIN vehicle v ON v.vehicle_id = b.vehicle_id
-      ORDER BY b.booking_date DESC, b.booking_id DESC
+      SELECT *, COUNT(*) OVER()::integer AS total_count
+      FROM v_booking_details
+      ORDER BY booking_date DESC, booking_id DESC
     `;
     const params = [];
 
@@ -555,15 +539,7 @@ const downloadBookingConfirmationPdf = async (req, res) => {
 
   try {
     const { rows } = await db.query(
-      `SELECT b.*,
-              vc.category_name,
-              p.title AS package_name
-       FROM booking b
-       LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-       LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-       LEFT JOIN package p ON p.package_id = bp.package_id
-       WHERE b.booking_id = $1
-       LIMIT 1`,
+      `SELECT * FROM v_booking_details WHERE booking_id = $1 LIMIT 1`,
       [bookingId]
     );
 
@@ -667,10 +643,9 @@ const updateAdditionalCharges = async (req, res) => {
 
   try {
     const { rows } = await db.query(`
-      SELECT b.quoted_price,
-             COALESCE((SELECT SUM(amount) FROM payment WHERE booking_id = b.booking_id AND status = 'APPROVED'), 0) AS total_paid
-      FROM booking b
-      WHERE b.booking_id = $1
+      SELECT quoted_price, total_paid
+      FROM v_booking_financial_summary
+      WHERE booking_id = $1
     `, [id]);
 
     if (rows.length === 0) {

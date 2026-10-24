@@ -31,6 +31,9 @@ router.get('/', pkgCtrl.listPublicPackages);
 // Recommendations for a package
 router.get('/:id/recommendations', pkgCtrl.getRecommendations);
 
+// Places nearby PostGIS search
+router.get('/places/nearby', pkgCtrl.getNearbyPlaces);
+
 // Public package detail
 router.get('/:id', pkgCtrl.getPackageDetail);
 

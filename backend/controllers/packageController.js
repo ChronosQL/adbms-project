@@ -321,8 +321,26 @@ exports.listPublicPackages = async (req, res) => {
         p.description,
         p.image_url,
         p.availability_status,
+        p.destinations,
+        p.total_places,
+        COALESCE(r.avg_rating, 0) AS avg_rating,
+        COALESCE(r.reviews_count, 0) AS reviews_count,
+        COALESCE(b.bookings_count, 0) AS bookings_count,
         COUNT(*) OVER()::integer AS total_count
-      FROM package p
+      FROM v_package_catalog p
+      LEFT JOIN (
+        SELECT bp.package_id,
+               ROUND(AVG(rv.rating), 2) AS avg_rating,
+               COUNT(rv.review_id)::integer AS reviews_count
+        FROM booking_package bp
+        JOIN review rv ON rv.booking_id = bp.booking_id
+        GROUP BY bp.package_id
+      ) r ON r.package_id = p.package_id
+      LEFT JOIN (
+        SELECT package_id, COUNT(*)::integer AS bookings_count
+        FROM booking_package
+        GROUP BY package_id
+      ) b ON b.package_id = p.package_id
       ${whereSql}
       ORDER BY p.package_id DESC
     `;
@@ -336,73 +354,17 @@ exports.listPublicPackages = async (req, res) => {
     const totalCount = packages.length > 0 ? packages[0].total_count : 0;
     const pagination = buildPagination(totalCount);
 
-    const packageIds = packages.map((p) => p.package_id);
-    let ratingsByPackage = {};
-    let bookingsByPackage = {};
-
-    if (packageIds.length > 0) {
-      const { rows: ratingRows } = await db.query(`
-        SELECT bp.package_id, AVG(r.rating) AS avg_rating, COUNT(r.review_id) AS reviews_count
-        FROM booking_package bp
-        INNER JOIN review r ON r.booking_id = bp.booking_id
-        WHERE bp.package_id = ANY($1)
-        GROUP BY bp.package_id
-      `, [packageIds]);
-
-      ratingsByPackage = ratingRows.reduce((acc, row) => {
-        acc[row.package_id] = {
-          avg_rating: row.avg_rating != null ? Number(row.avg_rating) : 0,
-          reviews_count: row.reviews_count != null ? Number(row.reviews_count) : 0,
-        };
-        return acc;
-      }, {});
-
-      const { rows: bookingRows } = await db.query(`
-        SELECT package_id, COUNT(*) AS bookings_count
-        FROM booking_package
-        WHERE package_id = ANY($1)
-        GROUP BY package_id
-      `, [packageIds]);
-
-      bookingsByPackage = bookingRows.reduce((acc, row) => {
-        acc[row.package_id] = Number(row.bookings_count) || 0;
-        return acc;
-      }, {});
-    }
-
-    let placesByPkg = {};
-    let placeCountByPkg = {};
-    if (packageIds.length > 0) {
-      const { rows: places } = await db.query(`
-        SELECT pp.package_id, pl.place_name, pl.image_url, pp.day_number,
-               COALESCE(pp.latitude, pl.latitude) AS latitude,
-               COALESCE(pp.longitude, pl.longitude) AS longitude
-        FROM package_place pp
-        INNER JOIN place pl ON pl.place_id = pp.place_id
-        WHERE pp.package_id = ANY($1)
-        ORDER BY pp.package_id, pp.day_number ASC
-      `, [packageIds]);
-      placeCountByPkg = places.reduce((acc, p) => {
-        acc[p.package_id] = (acc[p.package_id] || 0) + 1;
-        return acc;
-      }, {});
-      placesByPkg = places.reduce((acc, p) => {
-        acc[p.package_id] = acc[p.package_id] || [];
-        if (acc[p.package_id].length < 2) acc[p.package_id].push({
-          name: p.place_name,
-          image: p.image_url,
-          dayNumber: p.day_number,
-          latitude: p.latitude !== null && p.latitude !== undefined ? parseFloat(p.latitude) : null,
-          longitude: p.longitude !== null && p.longitude !== undefined ? parseFloat(p.longitude) : null,
-        });
-        return acc;
-      }, {});
-    }
-
     const result = packages.map(p => {
-      const shown = (placesByPkg[p.package_id] || []).length;
-      const total = placeCountByPkg[p.package_id] || 0;
-      const hidden = Math.max(0, total - shown);
+      const allDests = Array.isArray(p.destinations) ? p.destinations : [];
+      const shown = allDests.slice(0, 2).map(d => ({
+        name: d.name,
+        image: d.image,
+        dayNumber: d.dayNumber,
+        latitude: d.latitude !== null && d.latitude !== undefined ? parseFloat(d.latitude) : null,
+        longitude: d.longitude !== null && d.longitude !== undefined ? parseFloat(d.longitude) : null,
+      }));
+      const total = Number(p.total_places) || allDests.length;
+      const hidden = Math.max(0, total - shown.length);
 
       return {
         id: p.package_id,
@@ -412,11 +374,11 @@ exports.listPublicPackages = async (req, res) => {
         description: p.description,
         image: p.image_url,
         highlights: [],
-        destinations: placesByPkg[p.package_id] || [],
+        destinations: shown,
         hidden_dest_count: hidden,
-        avg_rating: ratingsByPackage[p.package_id]?.avg_rating || 0,
-        reviews_count: ratingsByPackage[p.package_id]?.reviews_count || 0,
-        bookings_count: bookingsByPackage[p.package_id] || 0,
+        avg_rating: Number(p.avg_rating) || 0,
+        reviews_count: Number(p.reviews_count) || 0,
+        bookings_count: Number(p.bookings_count) || 0,
         availability: buildAvailabilityPayload(p.availability_status),
       };
     });
@@ -813,3 +775,41 @@ exports.deletePackage = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.getNearbyPlaces = async (req, res) => {
+  const { lat, lng, radius } = req.query;
+  if (!lat || !lng) {
+    return res.status(400).json({ error: 'lat and lng query parameters are required.' });
+  }
+
+  const latitude = parseFloat(lat);
+  const longitude = parseFloat(lng);
+  const radiusKm = radius ? parseFloat(radius) : 50;
+
+  if (isNaN(latitude) || isNaN(longitude)) {
+    return res.status(400).json({ error: 'Invalid lat or lng parameters.' });
+  }
+
+  try {
+    const { rows } = await db.query(
+      'SELECT * FROM fn_get_places_nearby($1, $2, $3)',
+      [latitude, longitude, radiusKm]
+    );
+
+    res.json({
+      places: rows.map((r) => ({
+        id: r.place_id,
+        name: r.place_name,
+        description: r.description,
+        image: r.image_url,
+        latitude: r.latitude ? parseFloat(r.latitude) : null,
+        longitude: r.longitude ? parseFloat(r.longitude) : null,
+        distanceKm: r.distance_km ? parseFloat(r.distance_km) : null,
+      })),
+    });
+  } catch (error) {
+    console.error('getNearbyPlaces error:', error);
+    res.status(500).json({ error: 'Failed to find nearby places.' });
+  }
+};
+
