@@ -24,7 +24,6 @@ CREATE INDEX IF NOT EXISTS idx_booking_user_id ON booking(user_id);
 CREATE INDEX IF NOT EXISTS idx_booking_vehicle_id ON booking(vehicle_id);
 
 -- Composite Thread Indexes (Loads thread messages pre-sorted off disk)
-CREATE INDEX IF NOT EXISTS idx_chat_message_thread ON chat_message(topic_id, sent_at ASC);
 CREATE INDEX IF NOT EXISTS idx_contact_reply_thread ON contact_reply(inquiry_id, sent_at ASC);
 
 -- Partial Indexes for Instant Dashboard Badges

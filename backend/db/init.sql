@@ -532,7 +532,6 @@ CREATE INDEX IF NOT EXISTS idx_contact_reply_inquiry_id ON contact_reply(inquiry
 CREATE INDEX IF NOT EXISTS idx_booking_user_id ON booking(user_id);
 CREATE INDEX IF NOT EXISTS idx_booking_vehicle_id ON booking(vehicle_id);
 
-CREATE INDEX IF NOT EXISTS idx_chat_message_thread ON chat_message(topic_id, sent_at ASC);
 CREATE INDEX IF NOT EXISTS idx_contact_reply_thread ON contact_reply(inquiry_id, sent_at ASC);
 
 CREATE INDEX IF NOT EXISTS idx_booking_pending ON booking(booking_status) WHERE booking_status = 'PENDING';

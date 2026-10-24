@@ -19,101 +19,16 @@ const {
   safeNumber,
   toDateOnly,
   addOneYearToDate,
+  isInsuranceExpired,
   validateInsurancePeriod,
+  parseImageUrls,
+  mapCategory,
+  mapVehicle,
   extractCategoryPayload,
   extractVehiclePayload,
+  validateVehiclePayload,
 } = require('../dto/vehicleDto');
 
-const isInsuranceExpired = (startDate, endDate) => {
-  const today = new Date().toISOString().slice(0, 10);
-
-  const normalizedStartDate = toDateOnly(startDate);
-  if (normalizedStartDate) {
-    const oneYearEndDate = addOneYearToDate(normalizedStartDate);
-    if (oneYearEndDate) {
-      return today > oneYearEndDate;
-    }
-  }
-
-  const normalizedEndDate = toDateOnly(endDate);
-  if (!normalizedEndDate) return false;
-
-  return today > normalizedEndDate;
-};
-
-const mapCategory = (row) => ({
-  id: row.category_id,
-  name: row.category_name,
-  description: row.description || '',
-  image_url: (() => {
-    try {
-      const parsed = JSON.parse(row.image_url);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : (row.image_url || null);
-    } catch (e) {
-      return row.image_url || null;
-    }
-  })(),
-  images: (() => {
-    if (!row.image_url) return [];
-    try {
-      const parsed = JSON.parse(row.image_url);
-      return Array.isArray(parsed) ? parsed : [row.image_url];
-    } catch (e) {
-      return [row.image_url];
-    }
-  })(),
-  passenger_capacity: row.passenger_capacity || '',
-  luggage_capacity: row.luggage_capacity || '',
-  best_for: row.best_for || '',
-  comfort_level: row.comfort_level || '',
-  ac_available: Boolean(row.ac_available),
-  ideal_trip_types: row.ideal_trip_types || '',
-  vehicle_count: Number(row.vehicle_count || 0),
-});
-
-const mapVehicle = (row) => ({
-  id: row.vehicle_id,
-  category_id: row.category_id,
-  category_name: row.category_name || '',
-  vehicle_name: row.vehicle_name || row.name || '',
-  brand: row.brand || '',
-  model: row.model || '',
-  year: row.manufactured_year || null,
-  color: row.color || '',
-  license_plate: row.vehicle_number || '',
-  seats: row.adult_seats || 0,
-  fuel_type: row.fuel_type || '',
-  transmission: row.transmission || '',
-  air_conditioning: Boolean(row.air_conditioning),
-  luggage_capacity: row.luggage_capacity || 0,
-  price_per_day: row.price_per_day != null ? Number(row.price_per_day) : null,
-  vehicle_license: row.vehicle_license || '',
-  insurance_provider: row.insurance_provider || '',
-  insurance_start_date: toDateOnly(row.insurance_start_date),
-  insurance_end_date: toDateOnly(row.insurance_end_date),
-  insurance_expired: isInsuranceExpired(row.insurance_start_date, row.insurance_end_date),
-  status: toStatusLabel(row.vehicle_status),
-  image_url: (() => {
-    try {
-      const parsed = JSON.parse(row.image_url);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : (row.image_url || '');
-    } catch (e) {
-      return row.image_url || '';
-    }
-  })(),
-  images: (() => {
-    if (!row.image_url) return [];
-    try {
-      const parsed = JSON.parse(row.image_url);
-      return Array.isArray(parsed) ? parsed : [row.image_url];
-    } catch (e) {
-      return [row.image_url];
-    }
-  })(),
-  mileage: row.mileage || null,
-  engine_capacity: row.engine_capacity || '',
-  features: row.features || '',
-});
 
 const ensureDefaultCategories = async () => {
   const { rows: existingRows } = await db.query('SELECT category_name FROM vehicle_category');
@@ -196,21 +111,9 @@ exports.getCategoryById = async (req, res) => {
 
 exports.createCategory = async (req, res) => {
   try {
-    const { name, description = '', image_url, passenger_capacity, luggage_capacity, best_for, comfort_level, ac_available, ideal_trip_types } = req.body;
-    const uploadedImageUrls = req.files ? req.files.map(file => file.path || file.url || file.secure_url || file.location || file.filename) : [];
-    let existingUrls = [];
-    if (image_url) {
-      try {
-        const parsed = JSON.parse(image_url);
-        existingUrls = Array.isArray(parsed) ? parsed : [image_url];
-      } catch(e) {
-        existingUrls = [image_url];
-      }
-    }
-    const allUrls = [...existingUrls, ...uploadedImageUrls].filter(Boolean);
-    const resolvedImageUrl = allUrls.length > 0 ? JSON.stringify(allUrls) : null;
+    const payload = extractCategoryPayload(req.body, req.files);
 
-    if (!name) {
+    if (!payload.name) {
       return res.status(400).json({ success: false, message: 'Category name is required.' });
     }
 
@@ -218,15 +121,15 @@ exports.createCategory = async (req, res) => {
       `INSERT INTO vehicle_category (category_name, description, image_url, passenger_capacity, luggage_capacity, best_for, comfort_level, ac_available, ideal_trip_types)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING category_id`,
       [
-        name,
-        description || null,
-        resolvedImageUrl,
-        passenger_capacity || null,
-        luggage_capacity || null,
-        best_for || null,
-        comfort_level || null,
-        (ac_available === 'true' || ac_available === true) ? true : false,
-        ideal_trip_types || null
+        payload.name,
+        payload.description || null,
+        payload.imageUrl,
+        payload.passenger_capacity || null,
+        payload.luggage_capacity || null,
+        payload.best_for || null,
+        payload.comfort_level || null,
+        payload.ac_available,
+        payload.ideal_trip_types || null,
       ]
     );
 
@@ -234,15 +137,15 @@ exports.createCategory = async (req, res) => {
       success: true,
       data: {
         id: rows[0].category_id,
-        name,
-        description: description || '',
-        image_url: resolvedImageUrl,
-        passenger_capacity: passenger_capacity || '',
-        luggage_capacity: luggage_capacity || '',
-        best_for: best_for || '',
-        comfort_level: comfort_level || '',
-        ac_available: ac_available === 'true' || ac_available === true,
-        ideal_trip_types: ideal_trip_types || '',
+        name: payload.name,
+        description: payload.description,
+        image_url: payload.imageUrl,
+        passenger_capacity: payload.passenger_capacity,
+        luggage_capacity: payload.luggage_capacity,
+        best_for: payload.best_for,
+        comfort_level: payload.comfort_level,
+        ac_available: payload.ac_available,
+        ideal_trip_types: payload.ideal_trip_types,
         vehicle_count: 0,
       },
     });
@@ -254,10 +157,9 @@ exports.createCategory = async (req, res) => {
 
 exports.updateCategory = async (req, res) => {
   try {
-    const { name, description = '', image_url, passenger_capacity, luggage_capacity, best_for, comfort_level, ac_available, ideal_trip_types } = req.body;
-    const uploadedImageUrls = req.files ? req.files.map(file => file.path || file.url || file.secure_url || file.location || file.filename) : [];
+    const payload = extractCategoryPayload(req.body, req.files);
 
-    if (!name) {
+    if (!payload.name) {
       return res.status(400).json({ success: false, message: 'Category name is required.' });
     }
 
@@ -270,34 +172,21 @@ exports.updateCategory = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Category not found.' });
     }
 
-    let newUrls = [];
-    if (image_url) {
-      try {
-        const parsed = JSON.parse(image_url);
-        newUrls = Array.isArray(parsed) ? parsed : [image_url];
-      } catch(e) {
-        newUrls = [image_url];
-      }
-    }
-    const allUrls = [...newUrls, ...uploadedImageUrls].filter(Boolean);
-    let resolvedImageUrl = allUrls.length > 0 ? JSON.stringify(allUrls) : null;
-    if (!resolvedImageUrl && existingRows[0].image_url) {
-        resolvedImageUrl = existingRows[0].image_url;
-    }
+    const resolvedImageUrl = payload.imageUrl || existingRows[0].image_url;
 
     const { rowCount } = await db.query(
       `UPDATE vehicle_category SET category_name = $1, description = $2, image_url = $3, passenger_capacity = $4, luggage_capacity = $5, best_for = $6, comfort_level = $7, ac_available = $8, ideal_trip_types = $9 WHERE category_id = $10`,
       [
-        name,
-        description || null,
+        payload.name,
+        payload.description || null,
         resolvedImageUrl,
-        passenger_capacity || null,
-        luggage_capacity || null,
-        best_for || null,
-        comfort_level || null,
-        (ac_available === 'true' || ac_available === true) ? true : false,
-        ideal_trip_types || null,
-        req.params.id
+        payload.passenger_capacity || null,
+        payload.luggage_capacity || null,
+        payload.best_for || null,
+        payload.comfort_level || null,
+        payload.ac_available,
+        payload.ideal_trip_types || null,
+        req.params.id,
       ]
     );
 
@@ -478,73 +367,16 @@ exports.getVehicleById = async (req, res) => {
 
 exports.createVehicle = async (req, res) => {
   try {
-    const {
-      category_id,
-      vehicle_name,
-      name,
-      license_plate,
-      vehicle_number,
-      color,
-      year,
-      manufactured_year,
-      seats,
-      adult_seats,
-      luggage_capacity,
-      price_per_day,
-      vehicle_license,
-      insurance_provider,
-      insurance_start_date,
-      insurance_end_date,
-      image_url,
-      status,
-      brand,
-      model,
-      fuel_type,
-      transmission,
-      air_conditioning,
-      mileage,
-      engine_capacity,
-      features,
-    } = req.body;
-    const uploadedImageUrls = req.files ? req.files.map(file => file.path || file.url || file.secure_url || file.location || file.filename) : [];
-    let existingUrls = [];
-    if (image_url) {
-      try {
-        const parsed = JSON.parse(image_url);
-        existingUrls = Array.isArray(parsed) ? parsed : [image_url];
-      } catch(e) {
-        existingUrls = [image_url];
-      }
-    }
-    const allUrls = [...existingUrls, ...uploadedImageUrls].filter(Boolean);
-    const resolvedImageUrl = allUrls.length > 0 ? JSON.stringify(allUrls) : null;
-
-    const resolvedCategoryId = safeNumber(category_id);
-    if (!resolvedCategoryId) {
-      return res.status(400).json({ success: false, message: 'category_id is required.' });
+    const payload = extractVehiclePayload(req.body, req.files);
+    const validation = validateVehiclePayload(payload);
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, message: validation.message });
     }
 
-    const vehicleLabel = vehicle_name || name || '';
-    const plateNumber = license_plate || vehicle_number || '';
-    const resolvedYear = safeNumber(year || manufactured_year);
-
-    if (resolvedYear != null && resolvedYear < 1950) {
-      return res.status(400).json({ success: false, message: 'manufactured_year must be 1950 or later.' });
-    }
-
-    if (!vehicleLabel || !plateNumber || !vehicle_license || !insurance_provider || !insurance_start_date) {
-      return res.status(400).json({
-        success: false,
-        message: 'vehicle_name, license_plate, vehicle_license, insurance_provider, and insurance_start_date are required.',
-      });
-    }
-
-    const insuranceValidation = validateInsurancePeriod(insurance_start_date, insurance_end_date);
-    if (!insuranceValidation.valid) {
-      return res.status(400).json({ success: false, message: insuranceValidation.message });
-    }
-
-    const { rows: categoryRows } = await db.query('SELECT category_id FROM vehicle_category WHERE category_id = $1 LIMIT 1', [resolvedCategoryId]);
+    const { rows: categoryRows } = await db.query(
+      'SELECT category_id FROM vehicle_category WHERE category_id = $1 LIMIT 1',
+      [payload.categoryId]
+    );
     if (!categoryRows.length) {
       return res.status(404).json({ success: false, message: 'Category not found.' });
     }
@@ -577,29 +409,29 @@ exports.createVehicle = async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
       RETURNING vehicle_id`,
       [
-        resolvedCategoryId,
-        plateNumber,
-        vehicleLabel,
-        color || null,
-        safeNumber(year || manufactured_year),
-        safeNumber(seats || adult_seats) || 0,
+        payload.categoryId,
+        payload.licensePlate,
+        payload.vehicleName,
+        payload.color || null,
+        payload.manufacturedYear,
+        payload.adultSeats,
         0,
-        safeNumber(luggage_capacity) || 0,
-        safeNumber(price_per_day),
-        vehicle_license || null,
-        insurance_provider || null,
-        insuranceValidation.normalizedStartDate,
-        insuranceValidation.normalizedEndDate,
-        resolvedImageUrl,
-        normalizeStatus(status),
-        brand || null,
-        model || null,
-        fuel_type || null,
-        transmission || null,
-        Boolean(air_conditioning),
-        safeNumber(mileage),
-        engine_capacity || null,
-        features || null,
+        payload.luggageCapacity,
+        payload.pricePerDay,
+        payload.vehicleLicense || null,
+        payload.insuranceProvider || null,
+        payload.insuranceStartDate,
+        payload.insuranceEndDate,
+        payload.imageUrl,
+        payload.vehicleStatus,
+        payload.brand || null,
+        payload.model || null,
+        payload.fuelType || null,
+        payload.transmission || null,
+        payload.airConditioning,
+        payload.mileage,
+        payload.engineCapacity || null,
+        payload.features || null,
       ]
     );
 
@@ -652,53 +484,10 @@ exports.createVehicle = async (req, res) => {
 
 exports.updateVehicle = async (req, res) => {
   try {
-    const {
-      category_id,
-      vehicle_name,
-      name,
-      license_plate,
-      vehicle_number,
-      color,
-      year,
-      manufactured_year,
-      seats,
-      adult_seats,
-      luggage_capacity,
-      price_per_day,
-      vehicle_license,
-      insurance_provider,
-      insurance_start_date,
-      insurance_end_date,
-      image_url,
-      status,
-      brand,
-      model,
-      fuel_type,
-      transmission,
-      air_conditioning,
-      mileage,
-      engine_capacity,
-      features,
-    } = req.body;
-    const uploadedImageUrls = req.files ? req.files.map(file => file.path || file.url || file.secure_url || file.location || file.filename) : [];
-
-    const resolvedCategoryId = safeNumber(category_id);
-    const vehicleLabel = vehicle_name || name || '';
-    const plateNumber = license_plate || vehicle_number || '';
-    const resolvedYear = safeNumber(year || manufactured_year);
-    if (resolvedYear != null && resolvedYear < 1950) {
-      return res.status(400).json({ success: false, message: 'manufactured_year must be 1950 or later.' });
-    }
-    if (!vehicleLabel || !plateNumber || !vehicle_license || !insurance_provider || !insurance_start_date) {
-      return res.status(400).json({
-        success: false,
-        message: 'vehicle_name, license_plate, vehicle_license, insurance_provider, and insurance_start_date are required.',
-      });
-    }
-
-    const insuranceValidation = validateInsurancePeriod(insurance_start_date, insurance_end_date);
-    if (!insuranceValidation.valid) {
-      return res.status(400).json({ success: false, message: insuranceValidation.message });
+    const payload = extractVehiclePayload(req.body, req.files);
+    const validation = validateVehiclePayload(payload);
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, message: validation.message });
     }
 
     const { rows: existingRows } = await db.query(
@@ -710,20 +499,7 @@ exports.updateVehicle = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Vehicle not found.' });
     }
 
-    let newUrls = [];
-    if (image_url) {
-      try {
-        const parsed = JSON.parse(image_url);
-        newUrls = Array.isArray(parsed) ? parsed : [image_url];
-      } catch(e) {
-        newUrls = [image_url];
-      }
-    }
-    const allUrls = [...newUrls, ...uploadedImageUrls].filter(Boolean);
-    let resolvedImageUrl = allUrls.length > 0 ? JSON.stringify(allUrls) : null;
-    if (!resolvedImageUrl && existingRows[0].image_url) {
-        resolvedImageUrl = existingRows[0].image_url;
-    }
+    const resolvedImageUrl = payload.imageUrl || existingRows[0].image_url;
 
     const { rowCount } = await db.query(
       `UPDATE vehicle SET
@@ -751,28 +527,28 @@ exports.updateVehicle = async (req, res) => {
         features = $22
       WHERE vehicle_id = $23`,
       [
-        resolvedCategoryId,
-        plateNumber,
-        vehicleLabel,
-        color || null,
-        safeNumber(year || manufactured_year),
-        safeNumber(seats || adult_seats),
-        safeNumber(luggage_capacity),
-        safeNumber(price_per_day),
-        vehicle_license || null,
-        insurance_provider || null,
-        insuranceValidation.normalizedStartDate,
-        insuranceValidation.normalizedEndDate,
+        payload.categoryId,
+        payload.licensePlate,
+        payload.vehicleName,
+        payload.color || null,
+        payload.manufacturedYear,
+        payload.adultSeats,
+        payload.luggageCapacity,
+        payload.pricePerDay,
+        payload.vehicleLicense || null,
+        payload.insuranceProvider || null,
+        payload.insuranceStartDate,
+        payload.insuranceEndDate,
         resolvedImageUrl,
-        normalizeStatus(status),
-        brand || null,
-        model || null,
-        fuel_type || null,
-        transmission || null,
-        Boolean(air_conditioning),
-        safeNumber(mileage),
-        engine_capacity || null,
-        features || null,
+        payload.vehicleStatus,
+        payload.brand || null,
+        payload.model || null,
+        payload.fuelType || null,
+        payload.transmission || null,
+        payload.airConditioning,
+        payload.mileage,
+        payload.engineCapacity || null,
+        payload.features || null,
         req.params.id,
       ]
     );

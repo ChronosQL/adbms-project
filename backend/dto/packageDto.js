@@ -1,7 +1,7 @@
 /**
  * Package Data Transfer Object (DTO)
  * Consolidates package enum mapping, duration parsing, destination extraction,
- * and availability status normalization.
+ * availability status normalization, and row mappers for admin and public catalogs.
  */
 
 const PACKAGE_TYPE_LABEL_TO_ENUM = {
@@ -93,6 +93,80 @@ const extractPackagePayload = (body = {}) => {
   };
 };
 
+const mapAdminPackage = (r, destinationsByPackage = {}) => {
+  const dests = destinationsByPackage[r.package_id] || [];
+  const total = dests.length;
+  const shown = Math.min(2, total);
+  const hidden = Math.max(0, total - shown);
+
+  return {
+    id: r.package_id,
+    title: r.title,
+    type: toPackageTypeLabel(r.type),
+    days: toPackageDaysNumber(r.days),
+    description: r.description,
+    image_url: r.image_url,
+    destinations: dests,
+    places_count: total,
+    hidden_dest_count: hidden,
+    availability: buildAvailabilityPayload(r.availability_status),
+  };
+};
+
+const mapPublicPackage = (p) => {
+  const allDests = Array.isArray(p.destinations) ? p.destinations : [];
+  const shown = allDests.slice(0, 2).map((d) => ({
+    name: d.name,
+    image: d.image,
+    dayNumber: d.dayNumber,
+    latitude: d.latitude !== null && d.latitude !== undefined ? parseFloat(d.latitude) : null,
+    longitude: d.longitude !== null && d.longitude !== undefined ? parseFloat(d.longitude) : null,
+  }));
+  const total = Number(p.total_places) || allDests.length;
+  const hidden = Math.max(0, total - shown.length);
+
+  return {
+    id: p.package_id,
+    title: p.title,
+    type: toPackageTypeLabel(p.type),
+    days: toPackageDaysNumber(p.days),
+    description: p.description,
+    image: p.image_url,
+    highlights: [],
+    destinations: shown,
+    hidden_dest_count: hidden,
+    avg_rating: Number(p.avg_rating) || 0,
+    reviews_count: Number(p.reviews_count) || 0,
+    bookings_count: Number(p.bookings_count) || 0,
+    availability: buildAvailabilityPayload(p.availability_status),
+  };
+};
+
+const mapRelatedPackage = (r) => ({
+  id: r.id,
+  title: r.title,
+  type: r.type ? toPackageTypeLabel(r.type) : null,
+  days: r.days ? toPackageDaysNumber(r.days) : null,
+  image: r.image || r.image_url || null,
+  description: r.description || null,
+  avg_rating: r.avg_rating != null ? Number(r.avg_rating) : null,
+  reviews_count: r.reviews_count != null ? Number(r.reviews_count) : undefined,
+  bookings_count: r.bookings_count != null ? Number(r.bookings_count) : undefined,
+  destinations: [],
+  availability: { status: 'AVAILABLE' },
+});
+
+const mapPackagePlace = (r) => ({
+  id: r.place_id,
+  name: r.place_name,
+  description: r.description,
+  image_url: r.image_url,
+  day_number: r.day_number,
+  latitude: r.latitude !== null && r.latitude !== undefined ? parseFloat(r.latitude) : null,
+  longitude: r.longitude !== null && r.longitude !== undefined ? parseFloat(r.longitude) : null,
+  activities: r.activities || [],
+});
+
 module.exports = {
   PACKAGE_TYPE_LABEL_TO_ENUM,
   PACKAGE_TYPE_ENUM_TO_LABEL,
@@ -105,4 +179,8 @@ module.exports = {
   extractAvailabilityStatus,
   parseDestinations,
   extractPackagePayload,
+  mapAdminPackage,
+  mapPublicPackage,
+  mapRelatedPackage,
+  mapPackagePlace,
 };

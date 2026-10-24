@@ -8,8 +8,8 @@
     "dev": "nodemon server.js",
     "seed:admin": "node db/seedAdmin.js",
     "test:schema": "node --test tests/schema_regression.test.js",
-    "test:pagination": "node --test tests/pagination.test.js",
-    "test": "node --test tests/*.test.js"
+    "test:pagination": "node --env-file=.env --test tests/pagination.test.js",
+    "test": "node --env-file=.env --test tests/*.test.js"
   },
   "keywords": [
     "express",
@@ -19,7 +19,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.18.1",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^1.41.0",
@@ -30,9 +29,8 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "multer-storage-cloudinary": "^4.0.0",
-    "pg": "^8.13.1",
     "pdfkit": "^0.17.2",
-    "twilio": "^6.0.2"
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

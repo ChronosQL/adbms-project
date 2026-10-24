@@ -561,29 +561,6 @@ CREATE TABLE contact_reply (
 );
 
 -- =========================================================
--- Chat System
--- =========================================================
-DROP TABLE IF EXISTS chat_topic CASCADE;
-CREATE TABLE chat_topic (
-    topic_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    subject VARCHAR(100),
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_chat_topic_user FOREIGN KEY (user_id) REFERENCES "user"(user_id)
-);
-
-DROP TABLE IF EXISTS chat_message CASCADE;
-CREATE TABLE chat_message (
-    message_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    topic_id INTEGER NOT NULL,
-    sender_id INTEGER NOT NULL,
-    message TEXT NOT NULL,
-    sent_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_chat_message_topic FOREIGN KEY (topic_id) REFERENCES chat_topic(topic_id),
-    CONSTRAINT fk_chat_message_sender FOREIGN KEY (sender_id) REFERENCES "user"(user_id)
-);
-
--- =========================================================
 -- High-Performance B-Tree, Composite & Partial Indexes
 -- =========================================================
 CREATE INDEX IF NOT EXISTS idx_payment_booking_id ON payment(booking_id);
@@ -598,7 +575,6 @@ CREATE INDEX IF NOT EXISTS idx_contact_reply_inquiry_id ON contact_reply(inquiry
 CREATE INDEX IF NOT EXISTS idx_booking_user_id ON booking(user_id);
 CREATE INDEX IF NOT EXISTS idx_booking_vehicle_id ON booking(vehicle_id);
 
-CREATE INDEX IF NOT EXISTS idx_chat_message_thread ON chat_message(topic_id, sent_at ASC);
 CREATE INDEX IF NOT EXISTS idx_contact_reply_thread ON contact_reply(inquiry_id, sent_at ASC);
 
 CREATE INDEX IF NOT EXISTS idx_booking_pending ON booking(booking_status) WHERE booking_status = 'PENDING';

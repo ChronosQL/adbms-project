@@ -1,92 +1,12 @@
 const pool = require('../db/connection');
 const { parsePagination } = require('../utils/paginate');
 
-const COUNTRY_FLAGS = {
-  'Sri Lanka': '🇱🇰',
-  'Pakistan': '🇵🇰',
-  'Bangladesh': '🇧🇩',
-  'Nepal': '🇳🇵',
-  'United States': '🇺🇸',
-  'United Kingdom': '🇬🇧',
-  'Canada': '🇨🇦',
-  'Australia': '🇦🇺',
-  'India': '🇮🇳',
-  'Japan': '🇯🇵',
-  'Germany': '🇩🇪',
-  'France': '🇫🇷',
-  'Brazil': '🇧🇷',
-  'Netherlands': '🇳🇱',
-  'Italy': '🇮🇹',
-  'Spain': '🇪🇸',
-  'Mexico': '🇲🇽',
-  'China': '🇨🇳',
-  'South Africa': '🇿🇦',
-  'New Zealand': '🇳🇿',
-  'Thailand': '🇹🇭',
-  'Vietnam': '🇻🇳',
-  'Philippines': '🇵🇭',
-  'Indonesia': '🇮🇩',
-  'Malaysia': '🇲🇾',
-  'Singapore': '🇸🇬',
-  'Hong Kong': '🇭🇰',
-  'South Korea': '🇰🇷',
-  'UAE': '🇦🇪',
-  'Saudi Arabia': '🇸🇦',
-  'Turkey': '🇹🇷',
-  'Greece': '🇬🇷',
-  'Ireland': '🇮🇪',
-  'Switzerland': '🇨🇭',
-  'Sweden': '🇸🇪',
-  'Norway': '🇳🇴',
-  'Denmark': '🇩🇰',
-  'Belgium': '🇧🇪',
-  'Austria': '🇦🇹',
-  'Poland': '🇵🇱',
-  'Portugal': '🇵🇹',
-  'Israel': '🇮🇱',
-  'Russia': '🇷🇺',
-  'Ukraine': '🇺🇦',
-  'Argentina': '🇦🇷',
-  'Chile': '🇨🇱',
-  'Colombia': '🇨🇴',
-};
-
-const getCountryFlag = (country) => {
-  if (!country) return '🌍';
-  const key = String(country).trim();
-  return COUNTRY_FLAGS[key] || '🌍';
-};
-
-const normalizeImageUrls = (value) => {
-  if (!value) return [];
-  if (Array.isArray(value)) return value.filter(Boolean);
-  return [];
-};
-
-const extractUploadedImageUrl = (file) => {
-  if (!file) return null;
-  return file.path || file.url || file.secure_url || file.location || file.filename || null;
-};
-
-const mapReviewRow = (row) => ({
-  id: `r-${row.review_id}`,
-  bookingId: row.booking_id,
-  user: {
-    name: row.customer_name,
-    email: row.customer_email,
-    country: row.customer_country || 'Sri Lanka',
-    countryFlag: getCountryFlag(row.customer_country),
-    avatar: null,
-  },
-  tourTitle: row.tour_title || 'Tour Booking',
-  tourType: row.tour_type || 'Tour',
-  stars: row.rating,
-  driverName: row.driver_name || '',
-  title: row.title || 'Guest Review',
-  comment: row.feedback,
-  images: Array.isArray(row.images) ? row.images : [],
-  datePublished: new Date(row.created_at).toISOString().split('T')[0],
-});
+const {
+  mapReviewRow,
+  mapReviewableTourRow,
+  extractReviewPayload,
+  validateReviewPayload,
+} = require('../dto/reviewDto');
 
 const getPublishedReviews = async (req, res) => {
   const { stars, tourType, sort, email } = req.query;
@@ -194,16 +114,7 @@ const getReviewableTours = async (req, res) => {
       ORDER BY COALESCE(b.completed_at, b.booking_date) DESC
     `, [email]);
 
-    const result = tours.map((row) => ({
-      id: String(row.booking_id),
-      packageTitle: row.package_title || `${row.tour_type} Booking`,
-      packageType: row.tour_type,
-      completedDate: row.completed_at
-        ? new Date(row.completed_at).toISOString().split('T')[0]
-        : new Date(row.booking_date).toISOString().split('T')[0],
-    }));
-
-    res.json({ tours: result });
+    res.json({ tours: tours.map(mapReviewableTourRow) });
   } catch (error) {
     console.error('getReviewableTours failed:', error);
     res.status(500).json({ message: 'Failed to load reviewable tours.' });
@@ -211,26 +122,10 @@ const getReviewableTours = async (req, res) => {
 };
 
 const createReview = async (req, res) => {
-  const {
-    customerEmail,
-    bookingId,
-    stars,
-    driverName,
-    title,
-    comment,
-    tourTitle,
-    tourType,
-    images,
-  } = req.body;
-  const uploadedImageUrls = Array.isArray(req.files)
-    ? req.files.map(extractUploadedImageUrl).filter(Boolean)
-    : [];
-  const imageUrls = [...uploadedImageUrls, ...normalizeImageUrls(images)];
-
-  if (!customerEmail || !bookingId || !stars || !comment) {
-    return res.status(400).json({
-      message: 'customerEmail, bookingId, stars and comment are required.',
-    });
+  const payload = extractReviewPayload(req.body, req.files);
+  const validation = validateReviewPayload(payload);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
   }
 
   const client = await pool.connect();
@@ -243,7 +138,7 @@ const createReview = async (req, res) => {
       INNER JOIN "user" u ON u.user_id = b.user_id
       WHERE b.booking_id = $1 AND u.email = $2
       LIMIT 1
-    `, [bookingId, customerEmail]);
+    `, [payload.bookingId, payload.customerEmail]);
 
     if (bookingRows.length === 0) {
       await client.query('ROLLBACK');
@@ -258,7 +153,7 @@ const createReview = async (req, res) => {
 
     const { rows: existing } = await client.query(
       'SELECT review_id FROM review WHERE booking_id = $1 LIMIT 1',
-      [bookingId]
+      [payload.bookingId]
     );
     if (existing.length > 0) {
       await client.query('ROLLBACK');
@@ -277,16 +172,16 @@ const createReview = async (req, res) => {
       RETURNING review_id
     `, [
       booking.user_id,
-      bookingId,
-      stars,
-      driverName || null,
-      title || null,
-      comment,
+      payload.bookingId,
+      payload.stars,
+      payload.driverName || null,
+      payload.title || null,
+      payload.comment,
     ]);
 
     const reviewId = insertReview[0].review_id;
 
-    for (const url of imageUrls) {
+    for (const url of payload.images) {
       await client.query(
         'INSERT INTO review_image (review_id, image_url) VALUES ($1, $2)',
         [reviewId, url]
@@ -298,7 +193,7 @@ const createReview = async (req, res) => {
     res.status(201).json({
       message: 'Review created successfully.',
       reviewId,
-      imageUrls,
+      imageUrls: payload.images,
     });
   } catch (error) {
     await client.query('ROLLBACK');

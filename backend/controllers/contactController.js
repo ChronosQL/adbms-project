@@ -1,39 +1,27 @@
 const db = require('../db/connection');
 const { parsePagination } = require('../utils/paginate');
 
-const mapInquiry = (row) => ({
-  id:            row.inquiry_id,
-  customerName:  row.sender_name,
-  customerEmail: row.sender_email,
-  customerPhone: row.sender_phone  || null,
-  subject:       row.subject       || null,
-  message:       row.message,
-  isRead:        !!row.is_read,
-  status:        row.status,
-  createdAt:     row.submitted_at,
-  replies:       [],
-});
-
-const mapReply = (row) => ({
-  id:        row.reply_id,
-  inquiryId: row.inquiry_id,
-  from:      row.sender_role,
-  fromName:  row.sender_name,
-  message:   row.message,
-  timestamp: row.sent_at,
-});
+const {
+  mapInquiry,
+  mapReply,
+  extractInquiryPayload,
+  validateInquiryPayload,
+  extractReplyPayload,
+  validateReplyPayload,
+} = require('../dto/inquiryDto');
 
 const submitInquiry = async (req, res) => {
-  const { name, email, phone, subject, message } = req.body;
-
-  if (!name || !email || !message)
-    return res.status(400).json({ message: 'Name, email and message are required.' });
+  const payload = extractInquiryPayload(req.body);
+  const validation = validateInquiryPayload(payload);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
+  }
 
   try {
     const { rows } = await db.query(
       `INSERT INTO contact_inquiry (sender_name, sender_email, sender_phone, subject, message, status)
        VALUES ($1, $2, $3, $4, $5, 'new') RETURNING inquiry_id`,
-      [name, email, phone || null, subject || null, message]
+      [payload.name, payload.email, payload.phone, payload.subject, payload.message]
     );
     res.status(201).json({ message: 'Inquiry submitted successfully.', inquiryId: rows[0].inquiry_id });
   } catch (err) {
@@ -150,24 +138,22 @@ const getMyInquiries = async (req, res) => {
 
 const addReply = async (req, res) => {
   const { id } = req.params;
-  const { message } = req.body;
-  const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
-  const senderRole = isAdmin ? 'admin' : 'customer';
-  const senderName = req.user?.name || (isAdmin ? 'Ceylon Best Tours' : 'Customer');
-
-  if (!message?.trim())
-    return res.status(400).json({ message: 'Reply message is required.' });
+  const payload = extractReplyPayload(req.body, req.user);
+  const validation = validateReplyPayload(payload);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
+  }
 
   try {
     const { rows } = await db.query(
       `INSERT INTO contact_reply (inquiry_id, sender_role, sender_name, message) VALUES ($1, $2, $3, $4) RETURNING reply_id`,
-      [id, senderRole, senderName, message.trim()]
+      [id, payload.senderRole, payload.senderName, payload.message]
     );
 
-    const newStatus = isAdmin ? 'replied' : 'new';
+    const newStatus = payload.isAdmin ? 'replied' : 'new';
     await db.query(
       `UPDATE contact_inquiry SET status = $1, is_read = $2 WHERE inquiry_id = $3`,
-      [newStatus, isAdmin ? true : false, id]
+      [newStatus, payload.isAdmin ? true : false, id]
     );
 
     res.status(201).json({
@@ -175,9 +161,9 @@ const addReply = async (req, res) => {
       reply: {
         id:        rows[0].reply_id,
         inquiryId: Number(id),
-        from:      senderRole,
-        fromName:  senderName,
-        message:   message.trim(),
+        from:      payload.senderRole,
+        fromName:  payload.senderName,
+        message:   payload.message,
         timestamp: new Date().toISOString(),
       },
     });

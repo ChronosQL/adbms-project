@@ -2,9 +2,11 @@ const db = require('../db/connection');
 const { parsePagination } = require('../utils/paginate');
 
 const {
-  normalizeTourType,
   getBookingReference,
+  formatDate,
   formatLKR,
+  mapPaymentRow,
+  mapTransactionRow,
   extractPaymentPayload,
   validatePaymentPayload,
 } = require('../dto/paymentDto');
@@ -46,38 +48,7 @@ const getAllPayments = async (req, res) => {
     const totalCount = rows.length > 0 ? rows[0].total_count : 0;
     const pagination = buildPagination(totalCount);
 
-    const payments = rows.map((r) => ({
-      id: `PAY${String(r.payment_id).padStart(3, '0')}`,
-      rawId: r.payment_id,
-      bookingId: getBookingReference(r.tour_type, r.booking_id),
-      booking_id: r.booking_id,
-      tourType: r.tour_type === 'PACKAGE' ? 'Package Tour' : r.tour_type === 'CUSTOM' ? 'Customized' : 'P2P Tour',
-      customerName: r.customer_name,
-      customerPhone: r.customer_phone,
-      customerEmail: r.customer_email,
-      type: r.installment === 'DEPOSIT' ? 'Deposit' : r.installment === 'FINAL' ? 'Final' : r.installment === 'ADDITIONAL' ? 'Additional Charges' : 'Full Payment',
-      typePercent: r.installment === 'FULL' ? '100%' : r.installment === 'ADDITIONAL' ? 'Extra' : '50%',
-      amount: formatLKR(r.amount),
-      rawAmount: parseFloat(r.amount),
-      method: r.payment_method === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Cash',
-      date: r.received_date ? r.received_date.toISOString().split('T')[0] : 'Pending',
-      time: '12:00 PM',
-      status: r.status.toLowerCase(),
-      notes: r.notes,
-      recordedBy: r.recorded_by_name || 'Customer',
-      baseAmount: formatLKR(r.quoted_price || 0),
-      additionalCharges: formatLKR(r.additional_charges || 0),
-      rawAdditionalCharges: parseFloat(r.additional_charges || 0),
-      totalAmount: formatLKR(parseFloat(r.quoted_price || 0) + parseFloat(r.additional_charges || 0)),
-      tourDates: `${r.start_date.toISOString().split('T')[0]} to ${r.end_date.toISOString().split('T')[0]}`,
-      isBasePricePaid: parseFloat(r.total_paid || 0) >= parseFloat(r.quoted_price || 0),
-      slip: r.slip_url ? {
-        filename: r.slip_url.split('/').pop().slice(-20),
-        size: 'Cloudinary Upload',
-        uploadedAt: r.received_date ? r.received_date.toISOString().split('T')[0] : 'Pending',
-        previewUrl: r.slip_url
-      } : null
-    }));
+    const payments = rows.map(mapPaymentRow);
     payments.pagination = pagination;
 
     res.json({ payments, pagination });
@@ -123,8 +94,8 @@ const getPaymentsForBooking = async (req, res) => {
     const additionalCharges = booking.additional_charges ? parseFloat(booking.additional_charges) : 0;
     const price = basePrice + additionalCharges;
     const tourType = booking.tour_type;
-    const start_date = booking.start_date ? booking.start_date.toISOString().split('T')[0] : null;
-    const end_date = booking.end_date ? booking.end_date.toISOString().split('T')[0] : null;
+    const start_date = formatDate(booking.start_date);
+    const end_date = formatDate(booking.end_date);
 
     const approvedPayments = paymentRows.filter(p => p.status === 'APPROVED');
     const paidAmount = approvedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
@@ -146,7 +117,7 @@ const getPaymentsForBooking = async (req, res) => {
 
         if (approvedFull || paidAmount >= price) {
           status = 'PAID';
-          statusNote = `Paid on ${approvedFull ? approvedFull.received_date.toISOString().split('T')[0] : todayStr}`;
+          statusNote = `Paid on ${approvedFull && approvedFull.received_date ? formatDate(approvedFull.received_date) : todayStr}`;
         } else if (pendingFull) {
           status = 'PENDING';
           statusNote = 'Pending verification';
@@ -189,7 +160,7 @@ const getPaymentsForBooking = async (req, res) => {
 
         if (approvedDeposit || paidAmount >= depositAmt) {
           depStatus = 'PAID';
-          depStatusNote = `Paid on ${approvedDeposit ? approvedDeposit.received_date.toISOString().split('T')[0] : todayStr}`;
+          depStatusNote = `Paid on ${approvedDeposit && approvedDeposit.received_date ? formatDate(approvedDeposit.received_date) : todayStr}`;
         } else if (pendingDeposit) {
           depStatus = 'PENDING';
           depStatusNote = 'Pending verification';
@@ -219,7 +190,7 @@ const getPaymentsForBooking = async (req, res) => {
 
         if (approvedFinal || paidAmount >= basePrice) {
           finalStatus = 'PAID';
-          finalStatusNote = `Paid on ${approvedFinal ? approvedFinal.received_date.toISOString().split('T')[0] : todayStr}`;
+          finalStatusNote = `Paid on ${approvedFinal && approvedFinal.received_date ? formatDate(approvedFinal.received_date) : todayStr}`;
         } else if (pendingFinal) {
           finalStatus = 'PENDING';
           finalStatusNote = 'Pending verification';
@@ -251,7 +222,7 @@ const getPaymentsForBooking = async (req, res) => {
 
           if (approvedAdditional || paidAmount >= price) {
             additionalStatus = 'PAID';
-            additionalStatusNote = `Paid on ${approvedAdditional ? approvedAdditional.received_date.toISOString().split('T')[0] : todayStr}`;
+            additionalStatusNote = `Paid on ${approvedAdditional && approvedAdditional.received_date ? formatDate(approvedAdditional.received_date) : todayStr}`;
           } else if (pendingAdditional) {
             additionalStatus = 'PENDING';
             additionalStatusNote = 'Pending verification';
@@ -294,23 +265,12 @@ const getPaymentsForBooking = async (req, res) => {
       nextPaymentNote = 'Price is not yet quoted by admin.';
     }
 
-    const transactions = paymentRows.map(p => ({
-      id: `TX${String(p.payment_id).padStart(3, '0')}`,
-      rawId: p.payment_id,
-      date: p.received_date ? p.received_date.toISOString().split('T')[0] : 'Pending',
-      type: p.installment === 'DEPOSIT' ? 'Deposit' : p.installment === 'FINAL' ? 'Final Payment' : p.installment === 'ADDITIONAL' ? 'Additional Charges' : 'Full Payment',
-      amount: formatLKR(p.amount),
-      method: p.payment_method === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Cash',
-      status: p.status === 'APPROVED' ? 'VERIFIED' : p.status === 'REJECTED' ? 'REJECTED' : 'PENDING VERIFICATION',
-      recordedBy: p.recorded_by_name || 'Customer',
-      notes: p.notes,
-      slipUrl: p.slip_url,
-      tourId: getBookingReference(booking.tour_type, booking.booking_id),
-    }));
+    const bookingRef = getBookingReference(booking.tour_type, booking.booking_id);
+    const transactions = paymentRows.map((p) => mapTransactionRow(p, bookingRef));
 
     res.json({
       bookingId: bookingId,
-      bookingReference: getBookingReference(booking.tour_type, booking.booking_id),
+      bookingReference: bookingRef,
       tourType: booking.tour_type,
       startLocation: booking.start_location,
       endLocation: booking.end_location,
@@ -332,20 +292,15 @@ const getPaymentsForBooking = async (req, res) => {
 };
 
 const recordPayment = async (req, res) => {
-  const { booking_id, installment, amount, payment_method, received_date, notes } = req.body;
+  const payload = extractPaymentPayload(req.body);
+  const validation = validatePaymentPayload(payload);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
+  }
   const adminId = req.user.id;
 
-  if (!booking_id || !installment || !amount || !received_date) {
-    return res.status(400).json({ message: 'All required payment fields (booking_id, installment, amount, received_date) must be provided.' });
-  }
-
-  const amountNum = parseFloat(amount);
-  if (isNaN(amountNum) || amountNum <= 0) {
-    return res.status(400).json({ message: 'A valid positive payment amount is required.' });
-  }
-
   try {
-    const { rows: bookingRows } = await db.query('SELECT * FROM booking WHERE booking_id = $1', [booking_id]);
+    const { rows: bookingRows } = await db.query('SELECT * FROM booking WHERE booking_id = $1', [payload.bookingId]);
     if (bookingRows.length === 0) {
       return res.status(404).json({ message: 'Booking not found.' });
     }
@@ -359,23 +314,23 @@ const recordPayment = async (req, res) => {
 
     const { rows: finRows } = await db.query(
       'SELECT outstanding_balance FROM v_booking_financial_summary WHERE booking_id = $1',
-      [booking_id]
+      [payload.bookingId]
     );
     const remainingBalance = finRows.length ? parseFloat(finRows[0].outstanding_balance) : 0;
 
-    if (amountNum > remainingBalance) {
+    if (payload.amount > remainingBalance) {
       return res.status(400).json({
-        message: `Payment amount (${amountNum}) exceeds the outstanding balance (${remainingBalance}).`,
+        message: `Payment amount (${payload.amount}) exceeds the outstanding balance (${remainingBalance}).`,
         remainingBalance,
       });
     }
 
-    const resolvedMethod = payment_method || 'CASH';
+    const resolvedMethod = payload.paymentMethod || 'CASH';
 
     const { rows } = await db.query(`
       INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, recorded_by, status, notes)
       VALUES ($1, $2, $3, $4, $5, $6, 'APPROVED', $7) RETURNING payment_id
-    `, [booking_id, installment, amountNum, resolvedMethod, received_date, adminId, notes || null]);
+    `, [payload.bookingId, payload.installment, payload.amount, resolvedMethod, payload.receivedDate, adminId, payload.notes]);
 
     res.status(201).json({
       message: 'Payment recorded successfully.',

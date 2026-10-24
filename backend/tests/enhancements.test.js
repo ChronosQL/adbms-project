@@ -72,6 +72,7 @@ test('Enhancements: bookingController enforces one quote per booking atomically'
 
 test('Enhancements: bookingController stores and maps pickup & dropoff coordinates', () => {
   const code = fs.readFileSync(BOOKING_CONTROLLER, 'utf-8');
+  const dtoCode = fs.readFileSync(path.join(BACKEND_DIR, 'dto', 'bookingDto.js'), 'utf-8');
 
   assert.ok(
     code.includes('pickup_lat') && code.includes('dropoff_lng'),
@@ -79,8 +80,14 @@ test('Enhancements: bookingController stores and maps pickup & dropoff coordinat
   );
 
   assert.ok(
-    code.includes('pickupLat:') && code.includes('dropoffLng:'),
+    (code.includes('pickupLat:') || dtoCode.includes('pickupLat:')) &&
+    (code.includes('dropoffLng:') || dtoCode.includes('dropoffLng:')),
     'mapBooking must map pickupLat and dropoffLng fields.'
+  );
+
+  assert.ok(
+    code.includes('payload.packageId'),
+    'createP2PBooking must bind payload.packageId when inserting into booking_package.'
   );
 });
 
@@ -123,6 +130,23 @@ test('Enhancements: packageController supports server-side pagination', () => {
   assert.ok(
     code.includes('COUNT(*) OVER()::integer AS total_count'),
     'listPublicPackages must compute total_count using window function.'
+  );
+});
+
+test('Enhancements: reviewController and reportController robust error-free responses', () => {
+  const REVIEW_CONTROLLER = path.join(BACKEND_DIR, 'controllers', 'reviewController.js');
+  const REPORT_CONTROLLER = path.join(BACKEND_DIR, 'controllers', 'reportController.js');
+  const reviewCode = fs.readFileSync(REVIEW_CONTROLLER, 'utf-8');
+  const reportCode = fs.readFileSync(REPORT_CONTROLLER, 'utf-8');
+
+  assert.ok(
+    reviewCode.includes('imageUrls: payload.images'),
+    'createReview must return payload.images as imageUrls.'
+  );
+
+  assert.ok(
+    reportCode.includes("status = 'APPROVED'"),
+    'reportController earnings queries must filter for APPROVED payments.'
   );
 });
 
