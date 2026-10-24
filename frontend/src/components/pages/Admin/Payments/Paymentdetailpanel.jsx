@@ -30,46 +30,23 @@ function InfoRow({ label, value, highlight, linkLabel, onLink }) {
   );
 }
 
-function SlipPreview({ slip }) {
+function ReceiptDownload({ slip }) {
+  const [fileError, setFileError] = useState('');
+  const { downloadPaymentReceipt } = useBookings();
+
   if (!slip) return null;
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(slip.previewUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = slip.filename || 'payment-slip';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      setFileError('');
+      await downloadPaymentReceipt(slip.paymentId);
     } catch (err) {
-      console.error("Failed to download file directly:", err);
-      window.open(slip.previewUrl, '_blank');
+      setFileError(err.message || 'Receipt could not be downloaded.');
     }
   };
 
   return (
-    <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden">
-      <div className="bg-gray-50 h-28 flex items-center justify-center border-b border-gray-100">
-        {slip.previewUrl ? (
-          <img src={slip.previewUrl} alt="Payment slip" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex flex-col items-center gap-1 text-gray-300">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-              <polyline points="10 9 9 9 8 9"/>
-            </svg>
-            <span className="text-xs">No preview</span>
-          </div>
-        )}
-      </div>
-
+    <div className="mt-2 border border-gray-200 rounded-xl p-3">
       <div className="p-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-gray-700 truncate">{slip.filename}</p>
@@ -77,20 +54,21 @@ function SlipPreview({ slip }) {
           <p className="text-xs text-gray-400">Uploaded on {slip.uploadedAt}</p>
         </div>
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => window.open(slip.previewUrl, '_blank')} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">View Full Size</button>
-          <button onClick={handleDownload} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs bg-teal-50 border border-teal-200 rounded-lg text-teal-700 hover:bg-teal-100 transition-colors">Download</button>
+          <button onClick={handleDownload} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs bg-[#EF8354]/10 border border-[#EF8354]/20 rounded-lg text-[#EF8354] hover:bg-[#EF8354]/15 transition-colors">Download Receipt</button>
         </div>
       </div>
+      {fileError && <p role="alert" className="px-3 pb-3 text-xs text-red-700">{fileError}</p>}
     </div>
   );
 }
 
 export default function PaymentDetailPanel({ payment = null, onClose = () => {}, onApprove = () => {}, onReject = () => {}, loading = false }) {
   const [notes, setNotes] = useState("");
+  const [invoiceError, setInvoiceError] = useState("");
   const [additionalCharges, setAdditionalCharges] = useState(0);
   const [isUpdatingCharges, setIsUpdatingCharges] = useState(false);
   const navigate = useNavigate();
-  const { updateAdditionalCharges } = useBookings();
+  const { updateAdditionalCharges, downloadPaymentInvoice } = useBookings();
 
   useEffect(() => {
     if (payment) {
@@ -157,7 +135,10 @@ export default function PaymentDetailPanel({ payment = null, onClose = () => {},
               <InfoRow label="Base Amount" value={payment.baseAmount} />
               <InfoRow label="Additional Charges" value={payment.additionalCharges} />
               <InfoRow label="Total Amount" value={payment.totalAmount} highlight />
+              <InfoRow label="Approved Payments" value={payment.approvedAmount} />
+              <InfoRow label="Pending Receipts" value={payment.pendingAmount} />
               <InfoRow label="Remaining Amount" value={payment.remainingAmount} highlight />
+              <div className="pt-3"><button type="button" onClick={async () => { try { setInvoiceError(""); await downloadPaymentInvoice(payment.booking_id); } catch (err) { setInvoiceError(err.message || 'Invoice download failed.'); } }} className="px-3 py-2 rounded-lg bg-[#EF8354] text-white text-xs font-semibold">Download Booking Invoice</button>{invoiceError && <p role="alert" className="mt-2 text-xs text-red-700">{invoiceError}</p>}</div>
               <InfoRow label="Payment Method" value={payment.paymentMethod} />
               {payment.bankName && <InfoRow label="Bank Name" value={payment.bankName} />}
               {payment.referenceNumber && <InfoRow label="Reference Number" value={payment.referenceNumber} />}
@@ -165,7 +146,7 @@ export default function PaymentDetailPanel({ payment = null, onClose = () => {},
             </div>
 
             <SectionHeader title="Payment Slip" />
-            {payment.slip ? <SlipPreview slip={payment.slip} /> : <p className="text-xs text-gray-400 italic">No payment slip uploaded.</p>}
+            {payment.slip ? <ReceiptDownload slip={payment.slip} /> : <p className="text-xs text-gray-400 italic">No payment slip uploaded.</p>}
 
             {/* Additional Charges - Only for Custom and Package tours */}
             {payment.tourType !== 'P2P Tour' && (

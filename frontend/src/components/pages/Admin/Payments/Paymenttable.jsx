@@ -59,18 +59,7 @@ function MethodBadge({ method, slip }) {
         <span>{isBank ? "🏦" : "💵"}</span>
         <span>{isBank ? "Bank Transfer" : "Cash"}</span>
       </span>
-      {slip && (
-        <a
-          href={slip.previewUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          title="View uploaded payment slip"
-          className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#EF8354] hover:underline bg-[#EF8354]/10 border border-[#EF8354]/20 px-1.5 py-0.5 rounded"
-        >
-          <FileText size={11} /> Slip
-        </a>
-      )}
+      {slip && <span title="Open payment row to view uploaded receipt" className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#EF8354] bg-[#EF8354]/10 border border-[#EF8354]/20 px-1.5 py-0.5 rounded"><FileText size={11} /> Slip</span>}
     </div>
   );
 }

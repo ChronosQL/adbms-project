@@ -136,7 +136,7 @@ export default function PaymentApprovalsPage() {
     received_date: new Date().toISOString().split("T")[0],
     slipFile: null,
     notes: "",
-    installment: "FULL",
+    installment: "PARTIAL",
   });
 
   const [toast, setToast] = useState(null);
@@ -182,6 +182,8 @@ export default function PaymentApprovalsPage() {
       amountPaid: payment.amount,
       totalAmount: payment.totalAmount || payment.amount,
       remainingAmount: payment.payableAmount || payment.remainingAmount || "–",
+      approvedAmount: payment.approvedAmount || "LKR 0.00",
+      pendingAmount: payment.pendingAmount || "LKR 0.00",
       paymentMethod: payment.method,
       bankName: payment.method === "Bank Transfer" ? "Commercial Bank" : null,
       referenceNumber: payment.method === "Bank Transfer" ? `REF${payment.rawId}` : null,
@@ -283,7 +285,7 @@ export default function PaymentApprovalsPage() {
       paymentPayload.append("payment_method", form.payment_method);
       paymentPayload.append("received_date", form.received_date);
       paymentPayload.append("notes", form.notes || "");
-      paymentPayload.append("installment", amount >= payableBooking ? "FULL" : "PARTIAL");
+      paymentPayload.append("installment", form.installment || (Math.round(amount * 100) >= Math.round(payableBooking * 100) ? "FULL" : "PARTIAL"));
       if (form.slipFile) paymentPayload.append("slip", form.slipFile);
       await recordPayment(paymentPayload);
 
@@ -301,7 +303,7 @@ export default function PaymentApprovalsPage() {
         received_date: new Date().toISOString().split("T")[0],
         slipFile: null,
         notes: "",
-        installment: "FULL",
+        installment: "PARTIAL",
       });
     } catch (err) {
       showToast(err.message || "Failed to record payment.", "error");
@@ -961,10 +963,11 @@ export default function PaymentApprovalsPage() {
                         </label>
                         <select
                           value={form.installment}
-                          onChange={(e) => setForm((f) => ({ ...f, installment: e.target.value }))}
+                          onChange={(e) => setForm((f) => ({ ...f, installment: e.target.value, ...(e.target.value === 'FULL' ? { amount: String(payableBooking.toFixed(2)) } : {}) }))}
                           style={inputStyle}
                         >
                           <option value="FULL">Full Payment</option>
+                          <option value="PARTIAL">Partial Payment</option>
                           <option value="DEPOSIT">Deposit</option>
                           <option value="FINAL">Final Payment</option>
                           <option value="ADDITIONAL">Additional Charges</option>

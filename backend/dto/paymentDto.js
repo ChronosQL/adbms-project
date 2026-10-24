@@ -4,9 +4,10 @@
  */
 
 const { getBookingReference, formatDate } = require('./bookingDto');
+const { toCents, fromCents } = require('../utils/money');
 
 const formatLKR = (val) => {
-  return `LKR ${Number(val || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `LKR ${fromCents(toCents(val)).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const mapPaymentRow = (r) => ({
@@ -33,17 +34,18 @@ const mapPaymentRow = (r) => ({
   rawAdditionalCharges: parseFloat(r.additional_charges || 0),
   totalAmount: formatLKR(parseFloat(r.quoted_price || 0) + parseFloat(r.additional_charges || 0)),
   remainingAmount: formatLKR(r.outstanding_balance || 0),
+  approvedAmount: formatLKR(r.total_paid || 0),
   pendingAmount: formatLKR(r.pending_amount || 0),
-  payableAmount: formatLKR(Math.max(0, Number(r.outstanding_balance || 0) - Number(r.pending_amount || 0))),
+  payableAmount: formatLKR(fromCents(Math.max(0, toCents(r.outstanding_balance) - toCents(r.pending_amount)))),
   tourDates: r.start_date && r.end_date
     ? `${(r.start_date instanceof Date ? r.start_date.toISOString().split('T')[0] : String(r.start_date).slice(0, 10))} to ${(r.end_date instanceof Date ? r.end_date.toISOString().split('T')[0] : String(r.end_date).slice(0, 10))}`
     : 'N/A',
   isBasePricePaid: parseFloat(r.total_paid || 0) >= parseFloat(r.quoted_price || 0),
   slip: r.slip_url ? {
+    paymentId: r.payment_id,
     filename: r.slip_url.split('/').pop().slice(-20),
     size: 'Cloudinary Upload',
     uploadedAt: r.received_date ? (r.received_date instanceof Date ? r.received_date.toISOString().split('T')[0] : String(r.received_date).slice(0, 10)) : 'Pending',
-    previewUrl: r.slip_url,
   } : null,
 });
 
@@ -58,7 +60,7 @@ const mapTransactionRow = (p, bookingRef) => ({
   status: p.status === 'APPROVED' ? 'VERIFIED' : p.status === 'REJECTED' ? 'REJECTED' : 'PENDING VERIFICATION',
   recordedBy: p.recorded_by_name || 'Customer',
   notes: p.notes,
-  slipUrl: p.slip_url,
+  slipUrl: p.slip_url ? true : null,
   tourId: bookingRef || (p.tour_type && p.booking_id ? getBookingReference(p.tour_type, p.booking_id) : '—'),
 });
 

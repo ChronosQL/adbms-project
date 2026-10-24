@@ -11,7 +11,7 @@ import PaymentHistory from "./PaymentHistory";
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   const navigate = useNavigate();
-  const { bookings, getPaymentsForBooking, uploadPaymentSlip } = useBookings();
+  const { bookings, getPaymentsForBooking, uploadPaymentSlip, downloadPaymentInvoice, downloadPaymentReceipt } = useBookings();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
@@ -104,7 +104,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
 
     const amount = Number(payAmount);
     const payableAmount = Number(paymentData.payableAmount ?? remaining);
-    if (!Number.isFinite(amount) || amount <= 0 || amount > payableAmount) {
+    if (!Number.isFinite(amount) || amount <= 0 || Math.round(amount * 100) > Math.round(payableAmount * 100)) {
       showToast(`Enter an amount up to LKR ${payableAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}.`, "error");
       return;
     }
@@ -227,7 +227,10 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
                   bankName="Commercial Bank"
                   accountNumber="1234 5678 9012"
                   accountName="Ceylon Best Tours (Pvt) Ltd"
-                  onDownloadInvoice={() => showToast("Invoice download function will be available shortly.", "info")}
+                  onDownloadInvoice={async () => {
+                    try { await downloadPaymentInvoice(bookingId); }
+                    catch (err) { showToast(err.message || "Failed to download invoice.", "error"); }
+                  }}
                 />
               </div>
             </div>
@@ -236,6 +239,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
             <div className="mt-5">
               <PaymentHistory
                 transactions={paymentData.transactions}
+                downloadPaymentReceipt={downloadPaymentReceipt}
               />
             </div>
           </div>

@@ -80,7 +80,7 @@ const PaymentProof = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".png,.jpg,.jpeg,.pdf"
+          accept=".png,.jpg,.jpeg,.webp,.pdf"
           className="hidden"
           onChange={handleFileChange}
         />
@@ -95,7 +95,7 @@ const PaymentProof = ({
               <span className="font-semibold text-gray-800">Click to upload</span>{" "}
               or drag and drop
             </p>
-            <p className="text-xs text-gray-400 mt-1">PNG, JPG, PDF up to 5MB</p>
+            <p className="text-xs text-gray-400 mt-1">PNG, JPG, WebP, PDF up to 5MB</p>
           </>
         )}
       </div>

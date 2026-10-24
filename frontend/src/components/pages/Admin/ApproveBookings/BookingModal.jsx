@@ -181,7 +181,7 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
     if (!recInstallment) { setRecError("Select installment type"); return; }
     const amt = parseFloat(recAmount);
     if (isNaN(amt) || amt <= 0) { setRecError("Enter a valid amount"); return; }
-    if (paymentsData && amt > Number(paymentsData.payableAmount ?? paymentsData.remainingAmount)) { setRecError("Amount exceeds the balance currently available to pay."); return; }
+    if (paymentsData && Math.round(amt * 100) > Math.round(Number(paymentsData.payableAmount ?? paymentsData.remainingAmount) * 100)) { setRecError("Amount exceeds the balance currently available to pay."); return; }
     if (!recDate) { setRecError("Select received date"); return; }
 
     const isCash = recMethod === "CASH";
