@@ -214,6 +214,18 @@ test('Payment DTO: Reference formatting, amounts, and row mapping', () => {
   assert.equal(txMapped.status, 'VERIFIED');
 });
 
+test('Payment DTO: accepts flexible installment amounts with two-decimal precision only', () => {
+  const payload = paymentDto.extractPaymentPayload({
+    booking_id: '12', installment: 'PARTIAL', amount: '250.50', received_date: '2026-10-24',
+  });
+  assert.equal(paymentDto.validatePaymentPayload(payload).valid, true);
+
+  const invalidPrecision = paymentDto.extractPaymentPayload({
+    booking_id: '12', installment: 'PARTIAL', amount: '250.501', received_date: '2026-10-24',
+  });
+  assert.equal(paymentDto.validatePaymentPayload(invalidPrecision).valid, false);
+});
+
 // ==========================================
 // 5. Review DTO Tests
 // ==========================================

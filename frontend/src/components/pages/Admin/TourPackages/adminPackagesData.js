@@ -39,6 +39,7 @@ const mapBackendPackage = (p) => ({
   image: p.image_url || p.image || '',
   destinations: Array.isArray(p.destinations) ? p.destinations.map(d => ({
     ...d,
+    image: d.image_url || d.image || '',
     days: d.dayNumber || d.days || 1,
     latitude: d.latitude != null ? parseFloat(d.latitude) : null,
     longitude: d.longitude != null ? parseFloat(d.longitude) : null,
@@ -109,10 +110,13 @@ export const packageStore = {
         form.append('packageImage', data.packageImageFile);
       }
 
+      let imgIdx = 0;
       // collect dest images and strip from object sent inside JSON
       const dests = (data.destinations || []).map((d, i) => {
+        let assignedIdx = null;
         if (d.imageFile) {
           form.append('destImages', d.imageFile);
+          assignedIdx = imgIdx++;
         }
         return {
           name: d.name,
@@ -121,6 +125,8 @@ export const packageStore = {
           activities: d.activities || [],
           latitude: d.latitude != null ? parseFloat(d.latitude) : (d.lat != null ? parseFloat(d.lat) : null),
           longitude: d.longitude != null ? parseFloat(d.longitude) : (d.lng != null ? parseFloat(d.lng) : null),
+          image: d.image || d.image_url || null,
+          imageIndex: assignedIdx,
         };
       });
 
@@ -200,10 +206,17 @@ export const packageStore = {
       if (data.type != null) form.append('type', data.type);
       if (data.days != null) form.append('days', String(data.days));
       if (data.description != null) form.append('description', data.description || '');
-      if (data.packageImageFile) form.append('packageImage', data.packageImageFile);
+      if (data.packageImageFile) {
+        form.append('packageImage', data.packageImageFile);
+      }
 
+      let updateImgIdx = 0;
       const dests = (data.destinations || []).map((d, i) => {
-        if (d.imageFile) form.append('destImages', d.imageFile);
+        let assignedIdx = null;
+        if (d.imageFile) {
+          form.append('destImages', d.imageFile);
+          assignedIdx = updateImgIdx++;
+        }
         return {
           name: d.name,
           description: d.description,
@@ -211,6 +224,8 @@ export const packageStore = {
           activities: d.activities || [],
           latitude: d.latitude != null ? parseFloat(d.latitude) : (d.lat != null ? parseFloat(d.lat) : null),
           longitude: d.longitude != null ? parseFloat(d.longitude) : (d.lng != null ? parseFloat(d.lng) : null),
+          image: d.image || d.image_url || null,
+          imageIndex: assignedIdx,
         };
       });
       form.append('destinations', JSON.stringify(dests));

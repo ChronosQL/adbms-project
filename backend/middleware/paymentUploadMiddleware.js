@@ -16,5 +16,15 @@ const storage = new CloudinaryStorage({
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowed.includes(file.mimetype)) {
+      return callback(new Error('Receipt must be a JPG, PNG, WebP, or PDF file.'));
+    }
+    callback(null, true);
+  },
+});
 module.exports = upload;

@@ -95,12 +95,12 @@ test('Enhancements: paymentController enforces user ownership and balance guard'
   const code = fs.readFileSync(PAYMENT_CONTROLLER, 'utf-8');
 
   assert.ok(
-    code.includes('booking.user_id !== req.user.id'),
+    code.includes('Number(booking.user_id) !== Number(req.user.id)'),
     'uploadPaymentSlip must verify customer ownership.'
   );
 
   assert.ok(
-    code.includes('exceeds the remaining balance') || code.includes('exceeds the outstanding balance'),
+    code.includes('exceeds the remaining balance') || code.includes('exceeds the outstanding balance') || code.includes('exceeds the currently payable balance'),
     'paymentController must guard against overpayments.'
   );
 });

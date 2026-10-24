@@ -1,9 +1,9 @@
 import { useState, useContext } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Send, Lock, CheckCircle, AlertCircle } from "lucide-react";
 import { AuthContext } from "../../../../../context/AuthContext";
-import { submitPackageBooking, fetchMyBookings } from "../../../../../services/bookingService";
+import { submitPackageBooking, updateBooking, fetchMyBookings } from "../../../../../services/bookingService";
 import BookingStepIndicator from "./BookingStepIndicator";
 import BookingPassengersStep from "./BookingPassengersStep";
 import BookingNotesStep from "./BookingNotesStep";
@@ -164,6 +164,23 @@ const PackageBookingForm = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const editBooking = location.state?.editBooking || null;
+
+  const resolveCategorySlug = (catId, catName) => {
+    if (!catId && !catName) return "";
+    const map = {
+      "mini car": "mini_car", "normal car": "normal_car", "sedan car": "sedan_car",
+      "mpv": "mpv", "suv": "suv", "mini van": "mini_van", "van": "van", "large van": "large_van",
+      "1": "mini_car", "2": "normal_car", "3": "sedan_car", "4": "mpv",
+      "5": "suv", "6": "mini_van", "7": "van", "8": "large_van",
+    };
+    const byName = catName ? map[String(catName).trim().toLowerCase()] : null;
+    if (byName) return byName;
+    const byId = catId ? map[String(catId).trim()] : null;
+    if (byId) return byId;
+    return String(catId || "");
+  };
 
   const STEPS = [
   "Trip Details",
@@ -173,19 +190,49 @@ const PackageBookingForm = () => {
 ];
 
   const packageIdRaw = searchParams.get("packageId");
-  const packageId = packageIdRaw ? Number(packageIdRaw) : null;
-  const packageTitle = searchParams.get("packageTitle") || "Package Tour";
-  const packageDays = parsePackageDays(searchParams.get("packageDays"));
+  const packageId = packageIdRaw ? Number(packageIdRaw) : (editBooking?.packageId ? Number(editBooking.packageId) : null);
+  const packageTitle = searchParams.get("packageTitle") || editBooking?.packageName || "Package Tour";
+  const packageDays = parsePackageDays(searchParams.get("packageDays") || editBooking?.totalDays || editBooking?.daysRequired || 1);
 
   const [currentStep, setCurrentStep] = useState(0);
-  const [data, setData] = useState(() => ({
-    ...initialData,
-    customerName:          user?.name || "",
-    contactNumber:         user?.contact_number || "",
-    emergencyName:         user?.emergency_name || "",
-    emergencyPhone:        user?.emergency_phone || "",
-    emergencyRelationship: user?.emergency_relationship || "",
-  }));
+  const [data, setData] = useState(() => {
+    if (!editBooking) {
+      return {
+        ...initialData,
+        customerName:          user?.name || "",
+        contactNumber:         user?.contact_number || "",
+        emergencyName:         user?.emergency_name || "",
+        emergencyPhone:        user?.emergency_phone || "",
+        emergencyRelationship: user?.emergency_relationship || "",
+      };
+    }
+    return {
+      ...initialData,
+      ...editBooking,
+      customerName:          editBooking.customerName || user?.name || "",
+      contactPlatform:       editBooking.contactPlatform || "mobile",
+      contactNumber:         editBooking.contactNumber || editBooking.customerPhone || user?.contact_number || "",
+      contactPlatform2:      editBooking.contactPlatform2 || "",
+      contactNumber2:        editBooking.contactNumber2 || "",
+      startDate:             editBooking.startDate || "",
+      endDate:               editBooking.endDate || "",
+      pickupTime:            editBooking.pickupTime || "",
+      totalDays:             editBooking.totalDays || packageDays,
+      daysRequired:          editBooking.daysRequired || packageDays,
+      noOfAdults:            editBooking.noOfAdults || 1,
+      noOfChildren:          editBooking.noOfChildren || 0,
+      agesOfChildren:        editBooking.agesOfChildren || "",
+      babySeatNeeded:        editBooking.babySeatNeeded || false,
+      categoryId:            resolveCategorySlug(editBooking.categoryId, editBooking.categoryName),
+      luggage10kg:           editBooking.luggage10kg || 0,
+      luggage25kg:           editBooking.luggage25kg || 0,
+      luggage35kg:           editBooking.luggage35kg || 0,
+      emergencyName:         editBooking.emergencyName || user?.emergency_name || "",
+      emergencyPhone:        editBooking.emergencyPhone || user?.emergency_phone || "",
+      emergencyRelationship: editBooking.emergencyRelationship || user?.emergency_relationship || "",
+      notes:                 editBooking.notes || "",
+    };
+  });
   const [submitted, setSubmitted] = useState(false);
   const [bookingRef, setBookingRef] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -202,39 +249,54 @@ const PackageBookingForm = () => {
     setCurrentStep((s) => s - 1);
   };
 
+  const CATEGORY_LABELS = {
+    mini_car: "Mini Car", normal_car: "Normal Car", sedan_car: "Sedan Car",
+    mpv: "MPV", suv: "SUV", mini_van: "Mini Van", van: "Van", large_van: "Large Van",
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setError("");
     try {
-      // ── Duplicate booking guard ──────────────────────────────
-      // Prevent same customer from booking the same package on the same start date
-      try {
-        const myBookings = await fetchMyBookings();
-        const duplicate = (myBookings || []).some(
-          (b) =>
-            b.tourType === "PACKAGE" &&
-            String(b.packageId) === String(packageId) &&
-            b.startDate?.slice(0, 10) === data.startDate &&
-            ["PENDING", "QUOTED", "CONFIRMED", "TOUR_STARTED"].includes(b.status)
-        );
-        if (duplicate) {
-          setError(
-            "You already have an active booking for this package starting on the selected date. Please choose a different start date."
+      // ── Duplicate booking guard (only for new bookings) ──────
+      if (!editBooking?.id) {
+        try {
+          const myBookings = await fetchMyBookings();
+          const duplicate = (myBookings || []).some(
+            (b) =>
+              b.tourType === "PACKAGE" &&
+              String(b.packageId) === String(packageId) &&
+              b.startDate?.slice(0, 10) === data.startDate &&
+              ["PENDING", "QUOTED", "CONFIRMED", "TOUR_STARTED"].includes(b.status)
           );
-          setSubmitting(false);
-          return;
+          if (duplicate) {
+            setError(
+              "You already have an active booking for this package starting on the selected date. Please choose a different start date."
+            );
+            setSubmitting(false);
+            return;
+          }
+        } catch {
+          // If the pre-check fails, let the backend handle it
         }
-      } catch {
-        // If the pre-check fails, let the backend handle it
       }
 
-      const result = await submitPackageBooking({
+      const payload = {
         ...data,
+        tourType: 'PACKAGE',
+        categoryId: CATEGORY_LABELS[data.categoryId] || data.categoryId,
         customerEmail: user.email,
         packageId: packageId,
         packageName: packageTitle,
-      });
-      setBookingRef(result.bookingRef);
+      };
+
+      if (editBooking?.id) {
+        await updateBooking(editBooking.id, payload);
+        setBookingRef(editBooking.bookingRef || `CBT-PKG-${editBooking.id}`);
+      } else {
+        const result = await submitPackageBooking(payload);
+        setBookingRef(result.bookingRef);
+      }
       setSubmitted(true);
     } catch (err) {
       setError(err.message || "Submission failed. Please try again.");

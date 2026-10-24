@@ -17,6 +17,10 @@ const PaymentProof = ({
   uploadLabel = "Upload Payment Slip",
   uploadSublabel = "(For Final Payment)",
   onUpload,
+  amount = "",
+  maxAmount = 0,
+  onAmountChange = () => {},
+  submitting = false,
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -56,6 +60,10 @@ const PaymentProof = ({
         <span className="font-normal text-gray-400">{uploadSublabel}</span>
       </p>
 
+      <label className="block text-sm font-semibold text-gray-700 mb-2" htmlFor="payment-amount">Amount to pay (LKR)</label>
+      <input id="payment-amount" type="number" min="0.01" max={maxAmount} step="0.01" value={amount} onChange={(e) => onAmountChange(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8354] mb-4" />
+      <p className="text-xs text-gray-500 mb-4">Available now: LKR {Number(maxAmount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p>
+
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
@@ -63,10 +71,10 @@ const PaymentProof = ({
         onClick={() => fileInputRef.current?.click()}
         className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center cursor-pointer transition-colors mb-3 ${
           dragOver
-            ? "border-teal-400 bg-teal-50"
+            ? "border-[#EF8354] bg-orange-50"
             : selectedFile
             ? "border-green-400 bg-green-50"
-            : "border-gray-200 bg-gray-50 hover:border-teal-300 hover:bg-teal-50"
+            : "border-gray-200 bg-gray-50 hover:border-[#EF8354] hover:bg-orange-50"
         }`}
       >
         <input
@@ -116,10 +124,10 @@ const PaymentProof = ({
       {/* Submit Button */}
       <button
         onClick={handleSubmit}
-        disabled={!selectedFile}
+        disabled={!selectedFile || !Number(amount) || Number(amount) <= 0 || Number(amount) > maxAmount || submitting}
         className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
           selectedFile
-            ? "bg-purple-600 text-white hover:bg-purple-700 shadow-md"
+            ? "bg-[#EF8354] text-white hover:bg-[#df7243] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#EF8354]"
             : "bg-gray-100 text-gray-400 cursor-not-allowed"
         }`}
       >

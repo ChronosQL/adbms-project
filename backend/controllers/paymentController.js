@@ -29,10 +29,16 @@ const getAllPayments = async (req, res) => {
              u.name AS recorded_by_name,
              c.email AS customer_email,
              COALESCE(fs.total_paid, 0) AS total_paid,
+             COALESCE(fs.outstanding_balance, 0) AS outstanding_balance,
+             COALESCE(ps.pending_amount, 0) AS pending_amount,
              COUNT(*) OVER()::integer AS total_count
       FROM payment p
       JOIN booking b ON p.booking_id = b.booking_id
       LEFT JOIN v_booking_financial_summary fs ON fs.booking_id = b.booking_id
+      LEFT JOIN (
+        SELECT booking_id, SUM(amount) AS pending_amount
+        FROM payment WHERE status = 'PENDING' GROUP BY booking_id
+      ) ps ON ps.booking_id = b.booking_id
       LEFT JOIN "user" u ON p.recorded_by = u.user_id
       JOIN "user" c ON b.user_id = c.user_id
       ORDER BY CASE p.status WHEN 'PENDING' THEN 0 WHEN 'APPROVED' THEN 1 WHEN 'REJECTED' THEN 2 ELSE 3 END, p.payment_id DESC
@@ -65,7 +71,10 @@ const getPaymentsForBooking = async (req, res) => {
 
   try {
     const { rows: bookingRows } = await db.query(`
-      SELECT b.*, vc.category_name, v.name as vehicle_name, v.vehicle_number
+      SELECT b.booking_id, b.user_id, b.quoted_price, b.additional_charges, b.tour_type,
+             b.start_date, b.end_date, b.start_location, b.end_location,
+             b.category_id, b.vehicle_id, vc.category_name,
+             v.name AS vehicle_name, v.vehicle_number
       FROM booking b
       LEFT JOIN vehicle_category vc ON b.category_id = vc.category_id
       LEFT JOIN vehicle v ON b.vehicle_id = v.vehicle_id
@@ -83,7 +92,9 @@ const getPaymentsForBooking = async (req, res) => {
     }
 
     const { rows: paymentRows } = await db.query(`
-      SELECT p.*, u.name AS recorded_by_name
+      SELECT p.payment_id, p.booking_id, p.installment, p.amount, p.payment_method,
+             p.received_date, p.status, p.slip_url, p.notes, p.recorded_by,
+             u.name AS recorded_by_name
       FROM payment p
       LEFT JOIN "user" u ON p.recorded_by = u.user_id
       WHERE p.booking_id = $1
@@ -99,6 +110,7 @@ const getPaymentsForBooking = async (req, res) => {
 
     const approvedPayments = paymentRows.filter(p => p.status === 'APPROVED');
     const paidAmount = approvedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    const pendingAmount = paymentRows.filter(p => p.status === 'PENDING').reduce((sum, p) => sum + Number(p.amount), 0);
     const remainingAmount = Math.max(0, price - paidAmount);
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -281,6 +293,8 @@ const getPaymentsForBooking = async (req, res) => {
       totalAmount: price,
       paidAmount: paidAmount,
       remainingAmount: remainingAmount,
+      pendingAmount: pendingAmount,
+      payableAmount: Math.max(0, remainingAmount - pendingAmount),
       nextPaymentNote: nextPaymentNote,
       installments: installments,
       transactions: transactions
@@ -292,116 +306,138 @@ const getPaymentsForBooking = async (req, res) => {
 };
 
 const recordPayment = async (req, res) => {
-  const payload = extractPaymentPayload(req.body);
+  const payload = { ...extractPaymentPayload(req.body), slipUrl: req.file?.path || null };
   const validation = validatePaymentPayload(payload);
   if (!validation.valid) {
     return res.status(400).json({ message: validation.message });
   }
   const adminId = req.user.id;
-
+  const resolvedMethod = (payload.paymentMethod || 'CASH').toUpperCase();
+  if (resolvedMethod === 'BANK_TRANSFER' && !payload.slipUrl) {
+    return res.status(400).json({ message: 'Upload the bank receipt file to record a bank transfer.' });
+  }
+  const client = await db.connect();
   try {
-    const { rows: bookingRows } = await db.query('SELECT * FROM booking WHERE booking_id = $1', [payload.bookingId]);
-    if (bookingRows.length === 0) {
+    await client.query('BEGIN');
+    const { rows: bookingRows } = await client.query(
+      'SELECT booking_id, booking_status, quoted_price, additional_charges FROM booking WHERE booking_id = $1 FOR UPDATE',
+      [payload.bookingId]
+    );
+    if (!bookingRows.length) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Booking not found.' });
     }
 
     const booking = bookingRows[0];
     if (booking.booking_status === 'CLOSED' || booking.booking_status === 'CANCELLED') {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         message: `Cannot record payment. Booking is already ${booking.booking_status.toLowerCase()}.`
       });
     }
 
-    const { rows: finRows } = await db.query(
-      'SELECT outstanding_balance FROM v_booking_financial_summary WHERE booking_id = $1',
-      [payload.bookingId]
+    const { rows: totals } = await client.query(
+      `SELECT COALESCE(SUM(amount) FILTER (WHERE status = 'APPROVED'), 0) AS paid,
+              COALESCE(SUM(amount) FILTER (WHERE status = 'PENDING'), 0) AS pending
+       FROM payment WHERE booking_id = $1`, [payload.bookingId]
     );
-    const remainingBalance = finRows.length ? parseFloat(finRows[0].outstanding_balance) : 0;
+    const total = Number(booking.quoted_price || 0) + Number(booking.additional_charges || 0);
+    const remainingBalance = Math.max(0, total - Number(totals[0].paid) - Number(totals[0].pending));
 
     if (payload.amount > remainingBalance) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
-        message: `Payment amount (${payload.amount}) exceeds the outstanding balance (${remainingBalance}).`,
+        message: `Payment amount (${payload.amount}) exceeds the remaining balance (${remainingBalance}).`,
         remainingBalance,
       });
     }
 
-    const resolvedMethod = payload.paymentMethod || 'CASH';
+    if (resolvedMethod === 'CASH') {
+      const CASH_ALLOWED_STATUSES = ['TOUR_STARTED', 'COMPLETED'];
+      if (!CASH_ALLOWED_STATUSES.includes(booking.booking_status)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          message: `Cash payments can only be recorded when the tour status is TOUR_STARTED or COMPLETED. Current booking status is ${booking.booking_status}.`
+        });
+      }
+    }
 
-    const { rows } = await db.query(`
-      INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, recorded_by, status, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, 'APPROVED', $7) RETURNING payment_id
-    `, [payload.bookingId, payload.installment, payload.amount, resolvedMethod, payload.receivedDate, adminId, payload.notes]);
+    const { rows } = await client.query(`
+      INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, recorded_by, status, slip_url, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, 'APPROVED', $7, $8) RETURNING payment_id
+    `, [payload.bookingId, payload.installment, payload.amount, resolvedMethod, payload.receivedDate, adminId, payload.slipUrl, payload.notes]);
 
+    await client.query('COMMIT');
     res.status(201).json({
       message: 'Payment recorded successfully.',
       payment_id: rows[0].payment_id
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('recordPayment error:', err);
     res.status(500).json({ message: 'Failed to record payment.' });
+  } finally {
+    client.release();
   }
 };
 
 const uploadPaymentSlip = async (req, res) => {
-  const { booking_id, installment, amount, notes } = req.body;
+  const { booking_id, installment = 'PARTIAL', amount, notes } = req.body;
+  const amountNum = Number(amount);
+  const validPrecision = /^\d+(?:\.\d{1,2})?$/.test(String(amount ?? '').trim());
   const slipFile = req.file;
 
-  if (!booking_id || !installment || !amount) {
-    return res.status(400).json({ message: 'booking_id, installment, and amount are required.' });
+  if (!booking_id || !Number.isFinite(amountNum) || amountNum <= 0 || !validPrecision) {
+    return res.status(400).json({ message: 'booking_id and a positive payment amount are required.' });
   }
+  if (!slipFile) return res.status(400).json({ message: 'Payment receipt file is required.' });
 
-  const amountNum = parseFloat(amount);
-  if (isNaN(amountNum) || amountNum <= 0) {
-    return res.status(400).json({ message: 'A valid positive payment amount is required.' });
-  }
-
-  if (!slipFile) {
-    return res.status(400).json({ message: 'Payment slip file is required.' });
-  }
-
+  const client = await db.connect();
   try {
-    const { rows: bookingRows } = await db.query('SELECT * FROM booking WHERE booking_id = $1', [booking_id]);
-    if (bookingRows.length === 0) {
-      return res.status(404).json({ message: 'Booking not found.' });
-    }
-
-    const booking = bookingRows[0];
-
-    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
-    if (!isAdmin && booking.user_id !== req.user.id) {
-      return res.status(403).json({ message: 'Access denied: you can only submit payments for your own booking.' });
-    }
-
-    if (booking.booking_status === 'CANCELLED') {
-      return res.status(400).json({ message: 'Cannot upload payment slip for a cancelled booking.' });
-    }
-
-    const { rows: finRows } = await db.query(
-      'SELECT outstanding_balance FROM v_booking_financial_summary WHERE booking_id = $1',
+    await client.query('BEGIN');
+    const { rows: bookingRows } = await client.query(
+      'SELECT booking_id, user_id, booking_status, quoted_price, additional_charges FROM booking WHERE booking_id = $1 FOR UPDATE',
       [booking_id]
     );
-    const remainingBalance = finRows.length ? parseFloat(finRows[0].outstanding_balance) : 0;
-
-    if (amountNum > remainingBalance) {
-      return res.status(400).json({
-        message: `Payment amount (${amountNum}) exceeds the remaining balance (${remainingBalance}).`,
-        remainingBalance,
-      });
+    if (!bookingRows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Booking not found.' });
+    }
+    const booking = bookingRows[0];
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
+    if (!isAdmin && Number(booking.user_id) !== Number(req.user.id)) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ message: 'Access denied: you can only submit payments for your own booking.' });
+    }
+    if (['CANCELLED', 'CLOSED'].includes(booking.booking_status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: `Cannot upload payment receipt for a ${booking.booking_status.toLowerCase()} booking.` });
     }
 
-    const { rows } = await db.query(`
+    const { rows: totals } = await client.query(
+      `SELECT COALESCE(SUM(amount) FILTER (WHERE status = 'APPROVED'), 0) AS paid,
+              COALESCE(SUM(amount) FILTER (WHERE status = 'PENDING'), 0) AS pending
+       FROM payment WHERE booking_id = $1`, [booking_id]
+    );
+    const total = Number(booking.quoted_price || 0) + Number(booking.additional_charges || 0);
+    const available = Math.max(0, total - Number(totals[0].paid) - Number(totals[0].pending));
+    if (amountNum > available) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: `Payment amount (${amountNum}) exceeds the currently payable balance (${available}).`, remainingBalance: available });
+    }
+
+    const { rows } = await client.query(`
       INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, status, slip_url, notes)
       VALUES ($1, $2, $3, 'BANK_TRANSFER', CURRENT_DATE, 'PENDING', $4, $5) RETURNING payment_id
-    `, [booking_id, installment, amountNum, slipFile.path, notes || 'Uploaded by Customer']);
-
-    res.status(201).json({
-      message: 'Payment slip uploaded successfully. Under review by admin.',
-      payment_id: rows[0].payment_id,
-      slip_url: slipFile.path
-    });
+    `, [booking_id, String(installment).toUpperCase(), amountNum, slipFile.path, notes || 'Uploaded by Customer']);
+    await client.query('COMMIT');
+    res.status(201).json({ message: 'Payment receipt uploaded successfully. Under review by admin.', payment_id: rows[0].payment_id });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('uploadPaymentSlip error:', err);
-    res.status(500).json({ message: 'Failed to upload payment slip.' });
+    res.status(500).json({ message: 'Failed to upload payment receipt.' });
+  } finally {
+    client.release();
   }
 };
 
@@ -451,11 +487,52 @@ const rejectPayment = async (req, res) => {
   }
 };
 
+const updatePaymentSlip = async (req, res) => {
+  const { paymentId } = req.params;
+  const slipUrl = req.file?.path || null;
+
+  if (!slipUrl) {
+    return res.status(400).json({ message: 'Upload the receipt file to replace the payment slip.' });
+  }
+
+  try {
+    const { rows: paymentRows } = await db.query(
+      'SELECT p.payment_id, b.user_id FROM payment p JOIN booking b ON p.booking_id = b.booking_id WHERE p.payment_id = $1',
+      [paymentId]
+    );
+
+    if (paymentRows.length === 0) {
+      return res.status(404).json({ message: 'Payment record not found.' });
+    }
+
+    const payment = paymentRows[0];
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
+    if (!isAdmin && Number(payment.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Access denied: you can only update payment slips for your own booking.' });
+    }
+
+    await db.query(
+      'UPDATE payment SET slip_url = $1 WHERE payment_id = $2',
+      [slipUrl, paymentId]
+    );
+
+    res.json({
+      message: 'Payment slip updated successfully.',
+      paymentId: Number(paymentId),
+      slip_url: slipUrl,
+    });
+  } catch (err) {
+    console.error('updatePaymentSlip error:', err);
+    res.status(500).json({ message: 'Failed to update payment slip.' });
+  }
+};
+
 module.exports = {
   getAllPayments,
   getPaymentsForBooking,
   recordPayment,
   uploadPaymentSlip,
+  updatePaymentSlip,
   approvePayment,
   rejectPayment
 };

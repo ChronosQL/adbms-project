@@ -75,18 +75,17 @@ export const BookingsProvider = ({ children }) => {
   }, []);
 
   const recordPayment = useCallback(async (paymentData) => {
-    const res = await api.post(`/payments`, paymentData);
+    const res = paymentData instanceof FormData
+      ? await api.upload(`/payments`, paymentData)
+      : await api.post(`/payments`, paymentData);
     await getAllPayments();
     try { await getAllBookings(); } catch { await getCustomerBookings(); }
     return res;
   }, [getAllBookings, getCustomerBookings, getAllPayments]);
 
   const uploadPaymentSlip = useCallback(async (formData) => {
-    const res = await api.upload('/payments/upload-slip', formData);
-    await getAllPayments();
-    try { await getAllBookings(); } catch { await getCustomerBookings(); }
-    return res;
-  }, [getAllBookings, getCustomerBookings, getAllPayments]);
+    return await api.upload('/payments/upload-slip', formData);
+  }, []);
 
   const approvePayment = useCallback(async (paymentId, notes) => {
     const res = await api.patch(`/payments/${paymentId}/approve`, { notes });

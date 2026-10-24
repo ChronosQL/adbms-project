@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import { useBookings } from '../../../../context/BookingsContext.jsx';
 import BookingHeader from "./BookingHeader";
 import PaymentSummary from "./PaymentSummary";
-import PaymentBreakdown from "./PaymentBreakdown";
 import PaymentProof from "./PaymentProof";
 import PaymentReminders from "./PaymentReminders";
 import PaymentInformation from "./PaymentInformation";
@@ -17,6 +16,8 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   const [error, setError] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
   const [toast, setToast] = useState(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -35,6 +36,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
     getPaymentsForBooking(bookingId)
       .then(data => {
         setPaymentData(data);
+        setPayAmount(String(data.payableAmount ?? data.remainingAmount ?? ""));
       })
       .catch(err => {
         console.error("Error loading payment details:", err);
@@ -100,34 +102,37 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   const handleUpload = async ({ file, notes }) => {
     if (!file) return;
 
-    const currentPendingInstallment = paymentData.installments.find(i => i.status === 'PENDING' || i.status === 'OVERDUE');
-    const installmentType = currentPendingInstallment 
-      ? (currentPendingInstallment.type === 'Deposit' ? 'DEPOSIT' : currentPendingInstallment.type === 'Final Payment' ? 'FINAL' : currentPendingInstallment.type === 'Additional Charges' ? 'ADDITIONAL' : 'FULL')
-      : 'FULL';
-    
-    const installmentAmount = Math.min(
-      currentPendingInstallment ? currentPendingInstallment.rawAmount : remaining,
-      remaining
-    );
+    const amount = Number(payAmount);
+    const payableAmount = Number(paymentData.payableAmount ?? remaining);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > payableAmount) {
+      showToast(`Enter an amount up to LKR ${payableAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}.`, "error");
+      return;
+    }
 
     const formData = new FormData();
     formData.append('booking_id', bookingId);
-    formData.append('installment', installmentType);
-    formData.append('amount', installmentAmount);
+    formData.append('installment', amount >= payableAmount ? 'FULL' : 'PARTIAL');
+    formData.append('amount', amount.toFixed(2));
     formData.append('notes', notes || '');
     formData.append('slip', file);
 
     try {
-      setLoading(true);
+      setSubmitting(true);
       await uploadPaymentSlip(formData);
       showToast("Payment slip uploaded successfully! Under review.", "success");
-      const updated = await getPaymentsForBooking(bookingId);
-      setPaymentData(updated);
+      try {
+        const updated = await getPaymentsForBooking(bookingId);
+        setPaymentData(updated);
+        setPayAmount(String(updated.payableAmount ?? updated.remainingAmount ?? ""));
+      } catch (refreshError) {
+        console.error("Receipt submitted but payment history could not refresh:", refreshError);
+        showToast("Receipt submitted. Payment history could not refresh; reload this page to see its status.", "info");
+      }
     } catch (err) {
       console.error(err);
       showToast(err.message || "Failed to upload payment slip.", "error");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -176,12 +181,11 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
               nextPaymentNote={paymentData.nextPaymentNote}
             />
 
-            {/* Breakdown */}
-            <PaymentBreakdown
-              installments={paymentData.installments}
-              onViewDetails={(item) => showToast(`${item.type} (LKR ${item.amount}): Due ${item.dueDate} - ${item.dueDateNote}`, "info")}
-              onPayNow={(item) => showToast(`Please transfer due amount to bank details below. Admin will confirm receipt.`, "info")}
-            />
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div><p className="text-xs text-gray-500">Approved payments</p><p className="font-semibold text-green-700 tabular-nums">LKR {paid.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
+              <div><p className="text-xs text-gray-500">Pending receipts</p><p className="font-semibold text-amber-700 tabular-nums">LKR {Number(paymentData.pendingAmount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
+              <div><p className="text-xs text-gray-500">Still to pay</p><p className="font-semibold text-[#EF8354] tabular-nums">LKR {remaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
+            </div>
 
             {/* Two-column section */}
             <div className="grid grid-cols-3 gap-5">
@@ -193,6 +197,10 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
                     uploadedSubtext={uploadedSubtextText}
                     uploadLabel="Upload Receipt Copy"
                     uploadSublabel="(Offline verification)"
+                    amount={payAmount}
+                    maxAmount={Number(paymentData.payableAmount ?? remaining)}
+                    onAmountChange={setPayAmount}
+                    submitting={submitting}
                     onUpload={handleUpload}
                   />
                 ) : (
@@ -228,7 +236,6 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
             <div className="mt-5">
               <PaymentHistory
                 transactions={paymentData.transactions}
-                onViewSlip={(tx) => showToast(`TX details: Received on ${tx.date} via ${tx.method}. Recorded by ${tx.recordedBy}. Notes: ${tx.notes || 'None'}`, "info")}
               />
             </div>
           </div>

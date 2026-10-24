@@ -104,6 +104,17 @@ const createP2PBooking = async (req, res) => {
       );
     }
 
+    if (payload.emergencyName || payload.emergencyPhone || payload.emergencyRelationship) {
+      await client.query(
+        `UPDATE "user"
+         SET emergency_name = COALESCE($1, emergency_name),
+             emergency_phone = COALESCE($2, emergency_phone),
+             emergency_relationship = COALESCE($3, emergency_relationship)
+         WHERE user_id = $4`,
+        [payload.emergencyName, payload.emergencyPhone, payload.emergencyRelationship, req.user.id]
+      );
+    }
+
     await client.query('COMMIT');
 
     res.status(201).json({
@@ -348,6 +359,17 @@ const updateBooking = async (req, res) => {
         id,
       ]
     );
+
+    if (payload.emergencyName || payload.emergencyPhone || payload.emergencyRelationship) {
+      await client.query(
+        `UPDATE "user"
+         SET emergency_name = COALESCE($1, emergency_name),
+             emergency_phone = COALESCE($2, emergency_phone),
+             emergency_relationship = COALESCE($3, emergency_relationship)
+         WHERE user_id = $4`,
+        [payload.emergencyName, payload.emergencyPhone, payload.emergencyRelationship, req.user.id]
+      );
+    }
 
     await client.query('COMMIT');
     res.json({ message: 'Booking updated successfully.' });

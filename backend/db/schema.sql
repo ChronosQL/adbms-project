@@ -405,12 +405,6 @@ CREATE TABLE payment (
     CONSTRAINT fk_payment_user FOREIGN KEY (recorded_by) REFERENCES "user"(user_id)
 );
 
-DROP TABLE IF EXISTS city CASCADE;
-CREATE TABLE city (
-    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL
-);
-
 -- =========================================================
 -- Reviews
 -- =========================================================
@@ -847,4 +841,4 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_booking_status_history ON booking;
 CREATE TRIGGER trg_booking_status_history
 AFTER UPDATE OF booking_status ON booking
-FOR EACH ROW EXECUTE FUNCTION log_booking_status_change();
+FOR EACH ROW EXECUTE FUNCTION log_booking_status_change();

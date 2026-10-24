@@ -154,6 +154,21 @@ const PointToPoint = () => {
   const location = useLocation();
   const editBooking = location.state?.editBooking || null;
 
+  const resolveCategorySlug = (catId, catName) => {
+    if (!catId && !catName) return "";
+    const map = {
+      "mini car": "mini_car", "normal car": "normal_car", "sedan car": "sedan_car",
+      "mpv": "mpv", "suv": "suv", "mini van": "mini_van", "van": "van", "large van": "large_van",
+      "1": "mini_car", "2": "normal_car", "3": "sedan_car", "4": "mpv",
+      "5": "suv", "6": "mini_van", "7": "van", "8": "large_van",
+    };
+    const byName = catName ? map[String(catName).trim().toLowerCase()] : null;
+    if (byName) return byName;
+    const byId = catId ? map[String(catId).trim()] : null;
+    if (byId) return byId;
+    return String(catId || "");
+  };
+
   const [currentStep, setCurrentStep] = useState(0);
   const [maxReachedStep, setMaxReachedStep] = useState(0);
   const [data, setData] = useState(() => {
@@ -187,7 +202,7 @@ const PointToPoint = () => {
       noOfChildren: editBooking.noOfChildren || 0,
       agesOfChildren: editBooking.agesOfChildren || "",
       babySeatNeeded: editBooking.babySeatNeeded || false,
-      categoryId: editBooking.categoryId || "",
+      categoryId: resolveCategorySlug(editBooking.categoryId, editBooking.categoryName),
       luggage10kg: editBooking.luggage10kg || 0,
       luggage25kg: editBooking.luggage25kg || 0,
       luggage35kg: editBooking.luggage35kg || 0,

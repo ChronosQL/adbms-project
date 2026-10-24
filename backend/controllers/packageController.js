@@ -2,6 +2,12 @@ const db = require('../db/connection');
 const cloudinary = require('cloudinary').v2;
 const { parsePagination } = require('../utils/paginate');
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 const {
   PACKAGE_TYPE_LABEL_TO_ENUM,
   PACKAGE_TYPE_ENUM_TO_LABEL,
@@ -20,7 +26,7 @@ const {
   mapPackagePlace,
 } = require('../dto/packageDto');
 
-const uploadBufferToCloudinary = (file, folder) => new Promise((resolve) => {
+const uploadBufferToCloudinary = (file, folder) => new Promise((resolve, reject) => {
   if (!file) {
     console.debug(`[Cloudinary] No file provided for folder: ${folder}`);
     return resolve(null);
@@ -28,14 +34,12 @@ const uploadBufferToCloudinary = (file, folder) => new Promise((resolve) => {
 
   const existingUrl = file.path || file.url || file.secure_url || file.location || file.filename || null;
   if (!file.buffer) {
-    console.debug(`[Cloudinary] File has no buffer, using existing URL: ${existingUrl}`);
-    return resolve(existingUrl);
+    return existingUrl ? resolve(existingUrl) : reject(new Error('The selected file could not be read.'));
   }
 
   const hasCloudinaryConfig = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
   if (!hasCloudinaryConfig) {
-    console.warn(`[Cloudinary] Config missing (CLOUD_NAME, API_KEY, API_SECRET). Skipping upload for ${folder}.`);
-    return resolve(null);
+    return reject(new Error('Image upload is unavailable because file storage is not configured.'));
   }
 
   console.debug(`[Cloudinary] Starting upload to folder: ${folder}, file size: ${file.buffer.length} bytes, originalname: ${file.originalname}`);
@@ -50,7 +54,7 @@ const uploadBufferToCloudinary = (file, folder) => new Promise((resolve) => {
     (error, result) => {
       if (error) {
         console.error(`[Cloudinary] Upload failed for ${folder}:`, error.message || error);
-        return resolve(null);
+        return reject(new Error('Image upload failed. Please try again.'));
       }
       const url = result?.secure_url || result?.url || result?.path || null;
       console.debug(`[Cloudinary] Upload successful for ${folder}: ${url}`);
@@ -60,7 +64,7 @@ const uploadBufferToCloudinary = (file, folder) => new Promise((resolve) => {
 
   uploadStream.on('error', (err) => {
     console.error(`[Cloudinary] Stream error for ${folder}:`, err.message || err);
-    resolve(null);
+    reject(new Error('Image upload failed. Please try again.'));
   });
 
   uploadStream.end(file.buffer);
@@ -94,6 +98,7 @@ exports.createPackage = async (req, res) => {
     }
 
     const packageImageFile = req.files && req.files.packageImage && req.files.packageImage[0];
+    if (!packageImageFile) return res.status(400).json({ error: 'A package cover image file is required.' });
     const packageImage = await uploadBufferToCloudinary(packageImageFile, 'package_uploads');
     const destFiles = req.files && req.files.destImages ? req.files.destImages : [];
 
@@ -110,7 +115,13 @@ exports.createPackage = async (req, res) => {
 
       for (let i = 0; i < destinations.length; i++) {
         const dest = destinations[i] || {};
-        const destImage = await uploadBufferToCloudinary(destFiles[i], 'package_uploads') || dest.image || null;
+        let fileForDest = null;
+        if (dest.imageIndex !== undefined && dest.imageIndex !== null && destFiles[dest.imageIndex]) {
+          fileForDest = destFiles[dest.imageIndex];
+        } else if (destFiles.length === destinations.length) {
+          fileForDest = destFiles[i];
+        }
+        const destImage = fileForDest ? await uploadBufferToCloudinary(fileForDest, 'package_uploads') : (dest.image || null);
         const lat = (dest.latitude !== undefined && dest.latitude !== null && dest.latitude !== '')
           ? parseFloat(dest.latitude)
           : ((dest.lat !== undefined && dest.lat !== null && dest.lat !== '') ? parseFloat(dest.lat) : null);
@@ -164,7 +175,7 @@ exports.createPackage = async (req, res) => {
     }
   } catch (error) {
     console.error('createPackage failed:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to create package or upload its images.' });
   }
 };
 
@@ -466,7 +477,8 @@ exports.updatePackage = async (req, res) => {
     const availabilityStatus = extractAvailabilityStatus(req.body);
 
     const packageImageFile = req.files && req.files.packageImage && req.files.packageImage[0];
-    const packageImage = await uploadBufferToCloudinary(packageImageFile, 'package_uploads');
+    const uploadedPackageImage = packageImageFile ? await uploadBufferToCloudinary(packageImageFile, 'package_uploads') : null;
+    const packageImage = uploadedPackageImage;
     const destFiles = req.files && req.files.destImages ? req.files.destImages : [];
 
     let destinations = [];
@@ -528,7 +540,13 @@ exports.updatePackage = async (req, res) => {
 
       for (let i = 0; i < destinations.length; i++) {
         const dest = destinations[i] || {};
-        const destImage = await uploadBufferToCloudinary(destFiles[i], 'package_uploads') || dest.image || null;
+        let fileForDest = null;
+        if (dest.imageIndex !== undefined && dest.imageIndex !== null && destFiles[dest.imageIndex]) {
+          fileForDest = destFiles[dest.imageIndex];
+        } else if (destFiles.length === destinations.length) {
+          fileForDest = destFiles[i];
+        }
+        const destImage = fileForDest ? await uploadBufferToCloudinary(fileForDest, 'package_uploads') : (dest.image || null);
         const lat = (dest.latitude !== undefined && dest.latitude !== null && dest.latitude !== '')
           ? parseFloat(dest.latitude)
           : ((dest.lat !== undefined && dest.lat !== null && dest.lat !== '') ? parseFloat(dest.lat) : null);
@@ -574,7 +592,7 @@ exports.updatePackage = async (req, res) => {
     }
   } catch (error) {
     console.error('updatePackage failed:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to update package or upload its images.' });
   }
 };
 

@@ -134,6 +134,7 @@ export default function PaymentApprovalsPage() {
     amount: "",
     payment_method: "CASH", // "CASH" or "BANK_TRANSFER"
     received_date: new Date().toISOString().split("T")[0],
+    slipFile: null,
     notes: "",
     installment: "FULL",
   });
@@ -180,7 +181,7 @@ export default function PaymentApprovalsPage() {
       paymentType: `${payment.type} (${payment.typePercent})`,
       amountPaid: payment.amount,
       totalAmount: payment.totalAmount || payment.amount,
-      remainingAmount: "–",
+      remainingAmount: payment.payableAmount || payment.remainingAmount || "–",
       paymentMethod: payment.method,
       bankName: payment.method === "Bank Transfer" ? "Commercial Bank" : null,
       referenceNumber: payment.method === "Bank Transfer" ? `REF${payment.rawId}` : null,
@@ -247,7 +248,7 @@ export default function PaymentApprovalsPage() {
     setFormError("");
     try {
       const data = await getPaymentsForBooking(b.id);
-      setBookingPayments(data.payments || []);
+      setBookingPayments(data.transactions || []);
     } catch {
       setBookingPayments([]);
     }
@@ -266,31 +267,39 @@ export default function PaymentApprovalsPage() {
       return;
     }
 
+    const isCash = form.payment_method === "CASH";
+    const isCashAllowed = selectedBooking.status === "TOUR_STARTED" || selectedBooking.status === "COMPLETED";
+    if (isCash && !isCashAllowed) {
+      setFormError(`Cash payment can only be recorded when the tour is TOUR_STARTED or COMPLETED (current status: ${selectedBooking.status}).`);
+      return;
+    }
+
     setSubmitting(true);
     setFormError("");
     try {
-      await recordPayment({
-        booking_id: selectedBooking.id,
-        bookingId: selectedBooking.id,
-        amount,
-        payment_method: form.payment_method, // "CASH" or "BANK_TRANSFER"
-        received_date: form.received_date,
-        notes: form.notes || null,
-        installment: form.installment,
-      });
+      const paymentPayload = new FormData();
+      paymentPayload.append("booking_id", selectedBooking.id);
+      paymentPayload.append("amount", String(amount));
+      paymentPayload.append("payment_method", form.payment_method);
+      paymentPayload.append("received_date", form.received_date);
+      paymentPayload.append("notes", form.notes || "");
+      paymentPayload.append("installment", amount >= payableBooking ? "FULL" : "PARTIAL");
+      if (form.slipFile) paymentPayload.append("slip", form.slipFile);
+      await recordPayment(paymentPayload);
 
       const methodLabel = form.payment_method === "BANK_TRANSFER" ? "Bank Transfer" : "Cash payment";
       showToast(`${methodLabel} recorded successfully.`, "success");
 
       // Refresh payments for this booking & full audit list
       const data = await getPaymentsForBooking(selectedBooking.id);
-      setBookingPayments(data.payments || []);
+      setBookingPayments(data.transactions || []);
       await fetchAllPaymentsList();
 
       setForm({
         amount: "",
         payment_method: "CASH",
         received_date: new Date().toISOString().split("T")[0],
+        slipFile: null,
         notes: "",
         installment: "FULL",
       });
@@ -370,15 +379,16 @@ export default function PaymentApprovalsPage() {
     currentBookingPage * bookingLimit
   );
 
-  const approvedBookingPayments = bookingPayments.filter(
-    (p) => p.status === "approved" || p.status === "APPROVED"
-  );
+  const approvedBookingPayments = bookingPayments.filter((p) => p.status === "VERIFIED");
+  const pendingBookingPayments = bookingPayments.filter((p) => p.status === "PENDING VERIFICATION");
   const totalPaidBooking = approvedBookingPayments.reduce(
-    (sum, p) => sum + parseFloat(p.amount || 0),
+    (sum, p) => sum + Number(p.rawAmount || 0),
     0
   );
-  const quotedPriceBooking = selectedBooking?.quotedPrice || 0;
+  const pendingPaidBooking = pendingBookingPayments.reduce((sum, p) => sum + Number(p.rawAmount || 0), 0);
+  const quotedPriceBooking = Number(selectedBooking?.quotedPrice || 0) + Number(selectedBooking?.additionalCharges || 0);
   const outstandingBooking = Math.max(0, quotedPriceBooking - totalPaidBooking);
+  const payableBooking = Math.max(0, outstandingBooking - pendingPaidBooking);
 
   const inputStyle = {
     width: "100%",
@@ -795,6 +805,12 @@ export default function PaymentApprovalsPage() {
                             LKR {totalPaidBooking.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+                          <span style={{ color: t.textSecondary }}>Receipts pending review</span>
+                          <span style={{ fontWeight: 700, color: "#E3A857" }}>
+                            LKR {pendingPaidBooking.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                         {outstandingBooking > 0 && (
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
                             <span style={{ color: t.textSecondary }}>Outstanding</span>
@@ -803,6 +819,17 @@ export default function PaymentApprovalsPage() {
                             </span>
                           </div>
                         )}
+                      </div>
+                    )}
+                    {bookingPayments.length > 0 && (
+                      <div style={{ marginTop: 12, borderTop: `1px solid ${t.divider}`, paddingTop: 10 }}>
+                        <p style={{ fontSize: 12, fontWeight: 700, color: t.textSecondary, marginBottom: 6 }}>Payment history</p>
+                        {bookingPayments.map((payment) => (
+                          <div key={payment.rawId} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "6px 0", fontSize: 11, borderBottom: `1px solid ${t.divider}` }}>
+                            <span style={{ color: t.textSecondary }}>{payment.date} · {payment.type} · {payment.status}</span>
+                            <span style={{ color: t.textPrimary, fontWeight: 700, whiteSpace: "nowrap" }}>LKR {Number(payment.rawAmount || 0).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -873,7 +900,30 @@ export default function PaymentApprovalsPage() {
                             <span>🏦 Bank Transfer</span>
                           </button>
                         </div>
+
+                        {selectedBooking && selectedBooking.status !== "TOUR_STARTED" && selectedBooking.status !== "COMPLETED" && (
+                          <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(227,168,87,0.12)", border: "1px solid #E3A857" }}>
+                            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "#E3A857" }}>
+                              ⚠️ Cash collection is restricted until tour is in <strong>TOUR STARTED</strong> or <strong>COMPLETED</strong> status. (Current status: {selectedBooking.status})
+                            </p>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Receipt file (when Bank Transfer is selected) */}
+                      {form.payment_method === "BANK_TRANSFER" && (
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 700, color: t.textSecondary, display: "block", marginBottom: 6 }}>
+                            Bank Receipt *
+                          </label>
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp,.pdf"
+                            onChange={(e) => setForm((f) => ({ ...f, slipFile: e.target.files?.[0] || null }))}
+                            style={inputStyle}
+                          />
+                        </div>
+                      )}
 
                       {/* Amount */}
                       <div>
@@ -948,13 +998,13 @@ export default function PaymentApprovalsPage() {
                       <button
                         type="button"
                         onClick={handleSubmitPayment}
-                        disabled={submitting}
+                        disabled={submitting || (form.payment_method === "CASH" && selectedBooking && selectedBooking.status !== "TOUR_STARTED" && selectedBooking.status !== "COMPLETED")}
                         style={{
                           padding: "12px",
                           borderRadius: 10,
                           border: "none",
-                          cursor: submitting ? "not-allowed" : "pointer",
-                          background: submitting ? "#94a3b8" : BRAND.coral,
+                          cursor: (submitting || (form.payment_method === "CASH" && selectedBooking && selectedBooking.status !== "TOUR_STARTED" && selectedBooking.status !== "COMPLETED")) ? "not-allowed" : "pointer",
+                          background: (form.payment_method === "CASH" && selectedBooking && selectedBooking.status !== "TOUR_STARTED" && selectedBooking.status !== "COMPLETED") ? "#94a3b8" : (submitting ? "#94a3b8" : BRAND.coral),
                           color: "#fff",
                           fontFamily: FONT.body,
                           fontWeight: 700,
