@@ -436,7 +436,9 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: card, padding: 12, borderRadius: 12, border: `1px solid ${border}` }}>
                 <div>
                   <span style={{ fontSize: 10, fontWeight: 700, color: ts, textTransform: "uppercase" }}>Quoted Price</span>
-                  <p style={{ margin: "2px 0 0", fontSize: 15, fontWeight: 800, color: "#6366f1" }}>${booking.quotedPrice}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 15, fontWeight: 800, color: "#EF8354" }}>
+                    LKR {Number(booking.quotedPrice).toLocaleString('en-LK')}
+                  </p>
                 </div>
                 <div>
                   <span style={{ fontSize: 10, fontWeight: 700, color: ts, textTransform: "uppercase" }}>Assigned Vehicle</span>
@@ -453,7 +455,7 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
               <p style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 800, color: "#6366f1" }}>Set Price & Assign Vehicle</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: ts, textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 4 }}>Price (USD) *</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: ts, textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 4 }}>Price (LKR) *</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, background: card, border: `1px solid ${border}`, borderRadius: 10, padding: "9px 12px" }}>
                     <Banknote size={14} color="#EF8354" />
                     <input type="number" value={price} onChange={e => { setPrice(e.target.value); setErr(""); }} placeholder="0.00"
@@ -634,6 +636,12 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
                 <div style={{ borderTop: `1px solid ${border}`, paddingTop: 15, textAlign: "center" }}>
                   <p style={{ margin: 0, fontSize: 12, color: ts, fontWeight: 700 }}>
                     🔒 Booking is {booking.status.toLowerCase()}. No further payments can be initiated or recorded.
+                  </p>
+                </div>
+              ) : !["TOUR_STARTED", "COMPLETED"].includes(booking.status) ? (
+                <div style={{ borderTop: `1px solid ${border}`, paddingTop: 15, textAlign: "center" }}>
+                  <p style={{ margin: 0, fontSize: 12, color: ts, fontWeight: 700 }}>
+                    ⏳ Payment recording will become available once the tour has started (Current Status: {booking.status.replace("_", " ")}).
                   </p>
                 </div>
               ) : paymentsData && paymentsData.remainingAmount > 0 ? (

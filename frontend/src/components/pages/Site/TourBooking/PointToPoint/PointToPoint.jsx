@@ -52,7 +52,7 @@ const initialData = {
 const GuestGuard = ({ navigate }) => {
   
   return (
-  <div className="min-h-screen bg-[#BFC0C0] flex items-center justify-center px-4">
+  <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -74,7 +74,7 @@ const GuestGuard = ({ navigate }) => {
         </button>
         <button
           onClick={() => navigate("/register")}
-          className="border border-[#EF8354]/15 text-[#2D3142] px-6 py-3 rounded-xl font-semibold hover:bg-[#BFC0C0] transition-colors cursor-pointer"
+          className="border border-[#EF8354]/15 text-[#2D3142] px-6 py-3 rounded-xl font-semibold hover:bg-slate-100 transition-colors cursor-pointer"
         >
           {"Register"}
         </button>
@@ -102,21 +102,21 @@ const SuccessScreen = ({ bookingId, navigate }) => {
     </h2>
     <p className="text-[#6B7280] text-sm mb-2">{"Your booking reference is:"}</p>
     <p className="text-lg font-bold text-[#EF8354] mb-8">{bookingId}</p>
-    <div className="bg-[#BFC0C0] rounded-2xl p-5 mb-6 text-left space-y-2">
+    <div className="bg-[#EF8354]/10 border border-[#EF8354]/20 rounded-2xl p-5 mb-6 text-left space-y-2.5">
       {[
         "Your booking is now PENDING",
         "Our team will review and send a price quote within 24 hours",
-        "You can track your booking status from your profile",
+        "You can track your booking status from your bookings page",
       ].map((s, i) => (
-        <div key={i} className="flex items-start gap-2 text-sm text-[#2D3142]/70">
+        <div key={i} className="flex items-start gap-2.5 text-sm text-[#2D3142]">
           <span className="text-[#EF8354] font-bold flex-shrink-0">✓</span>
           {s}
         </div>
       ))}
     </div>
     <button
-      onClick={() => navigate("/user/profile")}
-      className="w-full bg-[#EF8354] hover:bg-[#4F5D75] text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 tracking-wide cursor-pointer"
+      onClick={() => navigate("/user/profile", { state: { activeTab: "bookings" } })}
+      className="w-full bg-[#EF8354] hover:bg-[#4F5D75] text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 tracking-wide cursor-pointer shadow-md shadow-[#EF8354]/20"
     >
       {"View My Bookings"}
     </button>
@@ -263,7 +263,8 @@ const PointToPoint = () => {
         luggage10kg: data.luggage10kg || 0,
         luggage25kg: data.luggage25kg || 0,
         luggage35kg: data.luggage35kg || 0,
-        luggageCustomCount: data.luggageCustomCount || 0,
+        luggageCustomCount: (data.hasCustomWeight || (data.luggageCustomCount || 0) > 0 || data.luggageCustomWeight) ? 1 : 0,
+        luggageCustomDesc: data.luggageCustomDesc || (data.luggageCustomWeight ? `${data.luggageCustomWeight}kg luggage` : null),
         luggageCustomItems: data.luggageCustomItems || [],
         customerName: data.customerName,
         contactPlatform: data.contactPlatform || "whatsapp",
@@ -291,7 +292,7 @@ const PointToPoint = () => {
   const canProceed = validateStep(currentStep, data);
  
   return (
-    <div className="min-h-screen bg-[#BFC0C0] pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16">
  
       {/* ── Page Title ── */}
       <div className="text-center py-12 px-4">
@@ -363,7 +364,7 @@ const PointToPoint = () => {
                     <button
                       onClick={handleBack}
                       disabled={currentStep === 0}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#EF8354]/15 text-[#2D3142]/70 font-semibold hover:bg-[#BFC0C0] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#EF8354]/15 text-[#2D3142]/70 font-semibold hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                     >
                       <ChevronLeft className="w-4 h-4" /> {"Back"}
                     </button>
@@ -384,7 +385,7 @@ const PointToPoint = () => {
                         <button
                           onClick={handleSubmit}
                           disabled={submitting}
-                          className="w-full bg-[#EF8354] hover:bg-[#4F5D75] disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 tracking-wide cursor-pointer"
+                          className="flex items-center gap-2 px-7 py-3 rounded-xl bg-[#EF8354] hover:bg-[#4F5D75] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold transition-colors cursor-pointer shadow-md shadow-[#EF8354]/20"
                         >
                           {submitting ? (
                             <><span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block" /> {"Submitting..."}</>

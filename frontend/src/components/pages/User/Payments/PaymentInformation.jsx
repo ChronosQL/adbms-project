@@ -30,7 +30,7 @@ const PaymentInformation = ({
 
       <button
         onClick={onDownloadInvoice}
-        className="inline-flex items-center gap-2 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-4 py-2 rounded-lg transition-colors w-full justify-center"
+        className="inline-flex items-center gap-2 text-xs font-bold text-[#EF8354] bg-[#EF8354]/10 hover:bg-[#EF8354]/20 border border-[#EF8354]/30 px-4 py-2.5 rounded-xl transition-colors w-full justify-center cursor-pointer"
       >
         <Download size={13} />
         Download Invoice

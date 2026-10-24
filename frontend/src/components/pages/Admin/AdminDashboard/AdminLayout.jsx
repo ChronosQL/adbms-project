@@ -107,8 +107,17 @@ export default function AdminLayout() {
   const NAV_ITEMS = buildNavItems(pendingCount, unreadCount);
 
   const currentNav = NAV_ITEMS.find(n => location.pathname.startsWith(n.path)) || NAV_ITEMS[0];
+  const pageTitle = location.pathname.startsWith("/admin/profile") ? "Admin Profile" : currentNav.label;
 
   const handleLogout = () => { logout(); navigate("/"); };
+
+  useEffect(() => {
+    if (dark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [dark]);
 
   useEffect(() => {
     const body = document.body;
@@ -192,36 +201,44 @@ export default function AdminLayout() {
               </div>
 
               {/* Dropdown — flies out to the right */}
-              <div className="
-                absolute bottom-0 left-[calc(100%+10px)] w-[200px]
-                bg-white border border-gray-100 rounded-2xl py-2
-                shadow-[0_20px_50px_rgba(0,0,0,0.18)]
-                opacity-0 invisible translate-x-2 scale-95
-                group-hover:opacity-100 group-hover:visible group-hover:translate-x-0 group-hover:scale-100
-                transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] z-50
-              ">
-                <div style={{ padding: "12px 20px", borderBottom: "1px solid #f1f5f9" }}>
-                  <p style={{ margin: 0, fontSize: 10, color: "#4F5D75", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Signed in as</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 800, color: BRAND.gunmetal }}>{user.name}</p>
+              <div
+                className="
+                  absolute bottom-0 left-[calc(100%+10px)] w-[210px]
+                  rounded-2xl py-2
+                  shadow-[0_20px_50px_rgba(0,0,0,0.25)]
+                  opacity-0 invisible translate-x-2 scale-95
+                  group-hover:opacity-100 group-hover:visible group-hover:translate-x-0 group-hover:scale-100
+                  transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] z-50
+                "
+                style={{
+                  background: t.cardBg,
+                  border: `1px solid ${t.cardBorder}`,
+                }}
+              >
+                <div style={{ padding: "12px 20px", borderBottom: `1px solid ${t.cardBorder}` }}>
+                  <p style={{ margin: 0, fontSize: 10, color: t.textSecondary, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Signed in as</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 800, color: t.textPrimary }}>{user.name}</p>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", paddingTop: 4 }}>
                   <Link
                     to="/admin/profile"
-                    style={{ padding: "10px 20px", fontSize: 14, fontWeight: 600, color: "#334155", borderRadius: 8, margin: "0 8px", fontFamily: FONT.body }}
+                    style={{ padding: "10px 20px", fontSize: 14, fontWeight: 600, color: t.textPrimary, borderRadius: 8, margin: "0 8px", fontFamily: FONT.body }}
                     onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,131,84,0.12)"; e.currentTarget.style.color = BRAND.coral; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#334155"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textPrimary; }}
                   >
                     My Profile
                   </Link>
-                  <div style={{ height: 1, background: "#f1f5f9", margin: "4px 12px" }} />
+                  <div style={{ height: 1, background: t.cardBorder, margin: "4px 12px" }} />
                   <button
                     onClick={handleLogout}
                     style={{
                       textAlign: "left", padding: "10px 20px", fontSize: 14, fontWeight: 700,
                       display: "flex", alignItems: "center", gap: 8,
-                      color: "#f87171", background: BRAND.gunmetal, border: "none", cursor: "pointer",
+                      color: "#f87171", background: "transparent", border: "none", cursor: "pointer",
                       borderRadius: "0 0 16px 16px", width: "100%",
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(224,72,59,0.1)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                   >
                     <LogIn size={15} style={{ transform: "rotate(180deg)" }} />
                     Logout
@@ -247,7 +264,7 @@ export default function AdminLayout() {
             {today}
           </p>
           <h1 style={{ fontFamily: FONT.heading, color: t.textPrimary, fontWeight: 900, fontSize: 28, margin: "2px 0 0", letterSpacing: "-0.5px" }}>
-            {currentNav.label}
+            {pageTitle}
           </h1>
         </div>
 

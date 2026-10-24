@@ -91,8 +91,8 @@ const VehicleDetailsModal = ({ isOpen, onClose, vehicle }) => {
                             </p>
                         </div>
                         <div className="text-right">
-                            <span className="text-2xl font-bold text-blue-600">
-                                USD {vehicle.price_per_day}
+                            <span className="text-2xl font-bold text-[#EF8354]">
+                                LKR {Number(vehicle.price_per_day).toLocaleString('en-LK')}
                             </span>
                             <p className="text-xs text-gray-500">per day</p>
                         </div>

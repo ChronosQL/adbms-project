@@ -103,7 +103,7 @@ function TourPackages() {
 	};
 
 	return (
-		<div className={dark ? 'min-h-screen bg-[#020617]' : 'min-h-screen bg-[#f8fafc]'}>
+		<div className={dark ? 'min-h-screen bg-[#2D3142]' : 'min-h-screen bg-[#F4F4F6]'}>
 		<AdminPackageHero
 			dark={dark}
 			total={packages.length}

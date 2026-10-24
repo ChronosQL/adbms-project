@@ -94,7 +94,7 @@ function MyMessages() {
         <h3 className="text-lg font-bold text-slate-800 mb-2">Please log in</h3>
         <p className="text-slate-500 text-sm mb-6">You need to be logged in to view your messages.</p>
         <button onClick={() => navigate("/login")}
-          className="bg-slate-900 text-white px-6 py-3 rounded-xl font-semibold hover:bg-slate-800 transition-colors">
+          className="bg-[#EF8354] hover:bg-[#4F5D75] text-white px-6 py-3 rounded-xl font-bold transition-colors cursor-pointer shadow-md shadow-[#EF8354]/20">
           Go to Login
         </button>
       </div>

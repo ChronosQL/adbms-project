@@ -268,17 +268,37 @@ const DestRow = ({ dest, index, onChange, onLocationChange, onRemove, canRemove,
       onChange={e => onChange(index, 'description', e.target.value)}
     />
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <label style={{ fontSize: '11px', fontWeight: 700, color: dark ? '#cbd5e1' : BRAND.payneGray, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Destination Photo
+      </label>
       <input
         type="file"
         accept="image/*"
-        style={{ marginTop: '4px', fontSize: '12px', color: dark ? '#cbd5e1' : BRAND.payneGray }}
         onChange={e => onChange(index, 'imageFile', e.target.files[0])}
+        className="w-full rounded-xl border px-3 py-1.5 text-xs file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-[#EF8354]/10 file:text-[#EF8354] hover:file:bg-[#EF8354]/20 focus:outline-none focus:border-[#EF8354] cursor-pointer transition-all"
+        style={{
+          background: dark ? '#242838' : '#FFFFFF',
+          color: dark ? '#cbd5e1' : '#2D3142',
+          borderColor: dark ? 'rgba(255,255,255,0.12)' : '#E8E8EA',
+        }}
       />
-      {dest.image && (
-        <img src={dest.image} alt="" style={{ height:'80px', borderRadius:'8px', objectFit:'cover', width:'100%', marginTop:'6px' }} onError={e => e.target.style.display='none'} />
-      )}
-      {dest.imageFile && (
-        <div style={{ marginTop: '4px', fontSize: '12px', color: BRAND.coral, fontWeight: 600 }}>Selected file: {dest.imageFile.name}</div>
+      {(dest.imageFile || dest.image) && (
+        <div style={{ position: 'relative', marginTop: '6px', borderRadius: '10px', overflow: 'hidden', border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E8E8EA', background: dark ? '#242838' : '#F7F7F8' }}>
+          <img
+            src={dest.imageFile ? URL.createObjectURL(dest.imageFile) : dest.image}
+            alt="Destination preview"
+            style={{ height: '90px', width: '100%', objectFit: 'cover', display: 'block' }}
+            onError={e => e.target.style.display = 'none'}
+          />
+          <span style={{
+            position: 'absolute', bottom: '6px', left: '8px',
+            fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px',
+            background: dest.imageFile ? BRAND.coral : 'rgba(45, 49, 66, 0.85)',
+            color: '#FFFFFF',
+          }}>
+            {dest.imageFile ? `New Selected: ${dest.imageFile.name}` : 'Current Photo'}
+          </span>
+        </div>
       )}
     </div>
     <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -698,20 +718,34 @@ const AdminPackageFormModal = ({ isOpen, pkg, onSave, onClose, dark = false, exi
                   <input
                     type="file"
                     accept="image/*"
-                    style={{ marginTop: 8, fontSize: '12px', color: dark ? '#cbd5e1' : BRAND.payneGray }}
                     onChange={e => set('packageImageFile', e.target.files[0])}
+                    className="w-full rounded-xl border px-3.5 py-2 text-sm file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EF8354]/10 file:text-[#EF8354] hover:file:bg-[#EF8354]/20 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer transition-all"
+                    style={{
+                      marginTop: 6,
+                      background: dark ? '#242838' : '#FFFFFF',
+                      color: dark ? '#cbd5e1' : '#2D3142',
+                      borderColor: dark ? 'rgba(255,255,255,0.12)' : '#E8E8EA',
+                    }}
                   />
-                  {form.image && (
-                    <img
-                      src={form.image}
-                      alt="Cover Preview"
-                      style={{ height: '110px', borderRadius: '10px', objectFit: 'cover', width: '100%', marginTop: '6px' }}
-                      onError={e => e.target.style.display = 'none'}
-                    />
-                  )}
-                  {form.packageImageFile && (
-                    <div style={{ marginTop: 6, fontSize: 12, color: BRAND.coral, fontWeight: 600 }}>
-                      Selected file: {form.packageImageFile.name}
+                  <p className="text-[11px] mt-1" style={{ color: dark ? '#94A3B8' : BRAND.payneGray }}>
+                    Choose an image from your PC. It will be stored and optimized via Cloudinary CDN.
+                  </p>
+                  {(form.packageImageFile || form.image) && (
+                    <div style={{ position: 'relative', marginTop: '10px', borderRadius: '12px', overflow: 'hidden', border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E8E8EA', background: dark ? '#242838' : '#F7F7F8' }}>
+                      <img
+                        src={form.packageImageFile ? URL.createObjectURL(form.packageImageFile) : form.image}
+                        alt="Cover Preview"
+                        style={{ height: '130px', borderRadius: '12px', objectFit: 'cover', width: '100%', display: 'block' }}
+                        onError={e => e.target.style.display = 'none'}
+                      />
+                      <span style={{
+                        position: 'absolute', bottom: '8px', left: '10px',
+                        fontSize: '11px', fontWeight: 800, padding: '3px 10px', borderRadius: '6px',
+                        background: form.packageImageFile ? BRAND.coral : 'rgba(45, 49, 66, 0.85)',
+                        color: '#FFFFFF',
+                      }}>
+                        {form.packageImageFile ? `New Cover Selected: ${form.packageImageFile.name}` : 'Current Cover Image'}
+                      </span>
                     </div>
                   )}
                 </Field>

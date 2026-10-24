@@ -11,7 +11,7 @@ const MyMessageEmpty = ({ navigate }) => (
     </p>
     <button
       onClick={() => navigate("/contact")}
-      className="bg-slate-900 text-white px-6 py-3 rounded-xl font-semibold hover:bg-slate-800 transition-colors"
+      className="bg-[#EF8354] hover:bg-[#4F5D75] text-white px-6 py-3 rounded-xl font-bold transition-colors cursor-pointer shadow-md shadow-[#EF8354]/20"
     >
       Contact Us
     </button>

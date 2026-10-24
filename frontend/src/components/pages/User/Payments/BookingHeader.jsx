@@ -20,7 +20,7 @@ const BookingHeader = ({
       <div className="flex items-center gap-4">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 bg-gray-900 text-white text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-gray-700 transition-colors"
+          className="flex items-center gap-2 bg-white border border-[#EF8354]/30 text-[#2D3142] font-semibold text-sm px-4 py-2.5 rounded-xl hover:border-[#EF8354] hover:text-[#EF8354] hover:bg-[#EF8354]/5 transition-all shadow-xs cursor-pointer"
         >
           <ArrowLeft size={15} />
           Back to Booking

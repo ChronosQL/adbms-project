@@ -81,10 +81,9 @@ const PaymentHistory = ({ transactions = [], downloadPaymentReceipt }) => {
         </table>
       )}
 
-      {/* Footer help text */}
       <p className="text-xs text-gray-400 text-center mt-6">
         Need help with your payment?{" "}
-        <a href="#" className="text-teal-600 font-semibold hover:underline">
+        <a href="#" className="text-[#EF8354] font-semibold hover:underline">
           Contact our support team.
         </a>
       </p>

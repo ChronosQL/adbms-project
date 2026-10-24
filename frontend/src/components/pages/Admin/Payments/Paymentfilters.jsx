@@ -29,6 +29,7 @@ export default function PaymentFilters({
   onFilterChange = () => {},
   activeTab = "all",
   onTabChange = () => {},
+  t = { cardBg: "#FFFFFF", cardBorder: "#E8E8EA", textPrimary: BRAND.gunmetal, textSecondary: BRAND.payneGray, headerBg: "#F7F7F8" },
 }) {
   return (
     <div className="mb-6 space-y-4">
@@ -37,14 +38,21 @@ export default function PaymentFilters({
         <div className="relative flex-1 min-w-0">
           <Search
             size={16}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
+            style={{ color: t.textSecondary }}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
           />
           <input
             type="text"
             placeholder="Search by Payment ID, Customer name, Booking ref, phone..."
             value={filters.search}
             onChange={(e) => onFilterChange("search", e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 transition-all"
+            style={{
+              background: t.cardBg,
+              borderColor: t.cardBorder,
+              color: t.textPrimary,
+              fontFamily: FONT.body,
+            }}
+            className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-xl placeholder:text-gray-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 transition-all font-medium"
           />
         </div>
 
@@ -53,7 +61,13 @@ export default function PaymentFilters({
           <select
             value={filters.method || ""}
             onChange={(e) => onFilterChange("method", e.target.value)}
-            className="appearance-none pl-3.5 pr-9 py-2.5 text-sm font-medium border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+            style={{
+              background: t.cardBg,
+              borderColor: t.cardBorder,
+              color: t.textPrimary,
+              fontFamily: FONT.body,
+            }}
+            className="appearance-none pl-3.5 pr-9 py-2.5 text-sm font-semibold border rounded-xl focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer transition-all"
           >
             {METHOD_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -63,7 +77,8 @@ export default function PaymentFilters({
           </select>
           <ChevronDown
             size={14}
-            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
+            style={{ color: t.textSecondary }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
           />
         </div>
 
@@ -72,7 +87,13 @@ export default function PaymentFilters({
           <select
             value={filters.type || ""}
             onChange={(e) => onFilterChange("type", e.target.value)}
-            className="appearance-none pl-3.5 pr-9 py-2.5 text-sm font-medium border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+            style={{
+              background: t.cardBg,
+              borderColor: t.cardBorder,
+              color: t.textPrimary,
+              fontFamily: FONT.body,
+            }}
+            className="appearance-none pl-3.5 pr-9 py-2.5 text-sm font-semibold border rounded-xl focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer transition-all"
           >
             {TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -82,12 +103,13 @@ export default function PaymentFilters({
           </select>
           <ChevronDown
             size={14}
-            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
+            style={{ color: t.textSecondary }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
           />
         </div>
       </div>
 
-      {/* ── Status Tabs ── */}
+      {/* ── Status Tabs (Filtration Tags) ── */}
       <div className="flex items-center gap-2 flex-wrap">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -96,17 +118,22 @@ export default function PaymentFilters({
               key={tab.key}
               type="button"
               onClick={() => onTabChange(tab.key)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                isActive
-                  ? "bg-[#EF8354] text-white shadow-sm"
-                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-              }`}
+              style={{
+                fontFamily: FONT.body,
+                background: isActive ? BRAND.coral : t.cardBg,
+                borderColor: isActive ? BRAND.coral : t.cardBorder,
+                color: isActive ? "#FFFFFF" : t.textSecondary,
+                boxShadow: isActive ? "0 2px 8px rgba(239,131,84,0.22)" : "none",
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-150 cursor-pointer hover:border-[#EF8354] hover:text-[#EF8354] active:scale-[0.98]"
             >
               <span>{tab.label}</span>
               <span
-                className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
-                  isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                }`}
+                style={{
+                  background: isActive ? "rgba(255,255,255,0.22)" : (t.dark ? "rgba(255,255,255,0.08)" : "#EEEEF0"),
+                  color: isActive ? "#FFFFFF" : t.textSecondary,
+                }}
+                className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full transition-colors"
               >
                 {counts[tab.countKey] ?? 0}
               </span>

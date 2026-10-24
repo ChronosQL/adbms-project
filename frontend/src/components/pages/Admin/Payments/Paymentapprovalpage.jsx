@@ -363,6 +363,8 @@ export default function PaymentApprovalsPage() {
 
   // ── Calculations for Record Payment Register (Preserved Bookings) ──
   const filteredBookings = bookings.filter((b) => {
+    const isTourStarted = ["TOUR_STARTED", "COMPLETED"].includes(b.status);
+    if (!isTourStarted) return false;
     const matchesStatus = statusFilter === "ALL" || b.status === statusFilter;
     if (!matchesStatus) return false;
     if (!search.trim()) return true;
@@ -466,7 +468,7 @@ export default function PaymentApprovalsPage() {
               fontWeight: 700,
               fontFamily: FONT.body,
               transition: "all 0.15s ease",
-              background: activeView === "audit" ? (dark ? "#0f172a" : "#fff") : "transparent",
+              background: activeView === "audit" ? t.cardBg : "transparent",
               color: activeView === "audit" ? BRAND.coral : t.textSecondary,
               boxShadow: activeView === "audit" ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
             }}
@@ -504,7 +506,7 @@ export default function PaymentApprovalsPage() {
               fontWeight: 700,
               fontFamily: FONT.body,
               transition: "all 0.15s ease",
-              background: activeView === "record" ? (dark ? "#0f172a" : "#fff") : "transparent",
+              background: activeView === "record" ? t.cardBg : "transparent",
               color: activeView === "record" ? BRAND.coral : t.textSecondary,
               boxShadow: activeView === "record" ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
             }}
@@ -517,7 +519,7 @@ export default function PaymentApprovalsPage() {
 
       {/* ── Stats Bar ── */}
       <div style={{ marginBottom: 20 }}>
-        <PaymentStatsBar stats={stats} />
+        <PaymentStatsBar stats={stats} dark={dark} t={t} />
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
@@ -537,6 +539,7 @@ export default function PaymentApprovalsPage() {
               setActiveTab(tab);
               setAuditPage(1);
             }}
+            t={t}
           />
 
           <PaymentTable
@@ -555,6 +558,8 @@ export default function PaymentApprovalsPage() {
               setAuditPage(1);
             }}
             loading={paymentsLoading}
+            dark={dark}
+            t={t}
           />
 
           {selectedPayment && (
@@ -564,6 +569,8 @@ export default function PaymentApprovalsPage() {
               onApprove={handleApprove}
               onReject={handleReject}
               loading={actionLoading || panelLoading}
+              dark={dark}
+              t={t}
             />
           )}
         </div>
@@ -799,7 +806,9 @@ export default function PaymentApprovalsPage() {
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                           <span style={{ color: t.textSecondary }}>Quoted Price</span>
-                          <span style={{ fontWeight: 700, color: t.textPrimary }}>${quotedPriceBooking}</span>
+                          <span style={{ fontWeight: 700, color: t.textPrimary }}>
+                            LKR {Number(quotedPriceBooking).toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+                          </span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
                           <span style={{ color: t.textSecondary }}>Total Paid (approved)</span>

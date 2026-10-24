@@ -107,27 +107,27 @@ const SuccessScreen = ({ bookingRef, navigate }) => {
     </h2>
     <p className="text-slate-500 text-sm mb-2">{"Your booking reference is:"}</p>
     <p className="text-lg font-bold text-[#EF8354] mb-8">{bookingRef}</p>
-    <div className="bg-slate-50 rounded-2xl p-5 mb-6 text-left space-y-2">
+    <div className="bg-[#EF8354]/10 border border-[#EF8354]/20 rounded-2xl p-5 mb-6 text-left space-y-2.5">
       {[
         "Your booking is now PENDING review",
         "Our team will send a price quote within 24 hours",
-        "You can track your booking status from your profile",
+        "You can track your booking status from your bookings page",
       ].map((s, i) => (
-        <div key={i} className="flex items-start gap-2 text-sm text-slate-600">
+        <div key={i} className="flex items-start gap-2.5 text-sm text-[#2D3142]">
           <span className="text-[#EF8354] font-bold flex-shrink-0">✓</span>
           {s}
         </div>
       ))}
     </div>
     <button
-      onClick={() => navigate("/user/profile")}
-      className="w-full bg-[#EF8354] hover:bg-[#4F5D75] text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 tracking-wide cursor-pointer mb-3"
+      onClick={() => navigate("/user/profile", { state: { activeTab: "bookings" } })}
+      className="w-full bg-[#EF8354] hover:bg-[#4F5D75] text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 tracking-wide cursor-pointer mb-3 shadow-md shadow-[#EF8354]/20"
     >
       {"View My Bookings"}
     </button>
     <button
       onClick={() => navigate("/tour-booking/package")}
-      className="w-full border border-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+      className="w-full border border-[#EF8354]/20 text-[#2D3142] py-3 rounded-xl font-bold hover:bg-[#EF8354]/5 transition-colors cursor-pointer"
     >
       {"Back to Packages"}
     </button>

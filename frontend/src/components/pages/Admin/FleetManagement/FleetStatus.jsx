@@ -1,11 +1,53 @@
 import React from 'react';
+import { Car, CheckCircle2, CalendarClock, Wrench } from 'lucide-react';
+import { BRAND, STATE } from '../AdminDashboard/adminTheme';
 
-const FleetStats = ({ stats, loading }) => {
+const STAT_CONFIG = [
+    {
+        key: 'total',
+        label: 'Total Fleet',
+        countKey: 'total',
+        icon: Car,
+        accent: '#3B82F6',
+    },
+    {
+        key: 'available',
+        label: 'Available Now',
+        countKey: 'available',
+        icon: CheckCircle2,
+        accent: STATE.success,
+    },
+    {
+        key: 'booked',
+        label: 'On Tour / Booked',
+        countKey: 'booked',
+        icon: CalendarClock,
+        accent: BRAND.coral,
+    },
+    {
+        key: 'maintenance',
+        label: 'In Maintenance',
+        countKey: 'maintenance',
+        icon: Wrench,
+        accent: STATE.warning,
+    },
+];
+
+const FleetStats = ({ stats, loading, dark = false, t }) => {
+    const cardBg = t ? t.cardBg : (dark ? "#383C4E" : "#FFFFFF");
+    const cardBorder = t ? t.cardBorder : (dark ? "rgba(255,255,255,0.08)" : "#E8E8EA");
+    const textPrimary = t ? t.textPrimary : (dark ? "#FFFFFF" : BRAND.gunmetal);
+    const textSecondary = t ? t.textSecondary : (dark ? "#B7BAC7" : BRAND.payneGray);
+
     if (loading) {
         return (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="animate-pulse bg-gray-200 rounded-xl h-24"></div>
+                    <div
+                        key={i}
+                        className="animate-pulse rounded-2xl h-24"
+                        style={{ background: dark ? "rgba(255,255,255,0.04)" : "#F3F4F6" }}
+                    ></div>
                 ))}
             </div>
         );
@@ -13,57 +55,44 @@ const FleetStats = ({ stats, loading }) => {
 
     if (!stats) return null;
 
-    const statCards = [
-        {
-            label: 'Total Vehicles',
-            value: stats.total,
-            icon: '🚗',
-            bgColor: 'bg-blue-50',
-            textColor: 'text-blue-700',
-            borderColor: 'border-blue-200',
-        },
-        {
-            label: 'Available',
-            value: stats.available,
-            icon: '✅',
-            bgColor: 'bg-green-50',
-            textColor: 'text-green-700',
-            borderColor: 'border-green-200',
-        },
-        {
-            label: 'Booked',
-            value: stats.booked,
-            icon: '📅',
-            bgColor: 'bg-purple-50',
-            textColor: 'text-purple-700',
-            borderColor: 'border-purple-200',
-        },
-        {
-            label: 'Maintenance',
-            value: stats.maintenance,
-            icon: '🔧',
-            bgColor: 'bg-yellow-50',
-            textColor: 'text-yellow-700',
-            borderColor: 'border-yellow-200',
-        },
-    ];
-
     return (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            {statCards.map((stat, index) => (
-                <div
-                    key={index}
-                    className={`${stat.bgColor} border ${stat.borderColor} rounded-xl p-4 transition-transform hover:scale-105`}
-                >
-                    <div className="flex items-center justify-between">
+            {STAT_CONFIG.map((item) => {
+                const IconComponent = item.icon;
+                const value = stats[item.countKey] || 0;
+
+                return (
+                    <div
+                        key={item.key}
+                        className="rounded-2xl p-4 flex items-center justify-between border shadow-xs transition-transform hover:-translate-y-0.5 duration-200"
+                        style={{
+                            background: cardBg,
+                            borderColor: cardBorder,
+                        }}
+                    >
                         <div>
-                            <p className="text-xs text-gray-500 font-medium">{stat.label}</p>
-                            <p className={`text-2xl font-bold ${stat.textColor}`}>{stat.value}</p>
+                            <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: textSecondary }}>
+                                {item.label}
+                            </p>
+                            <p
+                                className="text-2xl font-extrabold leading-tight"
+                                style={{ color: textPrimary, fontFamily: "'Montserrat', sans-serif" }}
+                            >
+                                {value}
+                            </p>
                         </div>
-                        <span className="text-3xl">{stat.icon}</span>
+                        <div
+                            className="p-3 rounded-xl flex-shrink-0"
+                            style={{
+                                background: `${item.accent}18`,
+                                color: item.accent,
+                            }}
+                        >
+                            <IconComponent size={22} strokeWidth={2.2} />
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 };

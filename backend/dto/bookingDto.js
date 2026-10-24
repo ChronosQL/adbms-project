@@ -27,7 +27,7 @@ const formatMoney = (value) => {
   if (value === null || value === undefined) return 'N/A';
   const n = Number(value);
   if (Number.isNaN(n)) return 'N/A';
-  return `USD ${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `LKR ${n.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const getPaymentScheduleLines = (tourType, quotedPrice) => {

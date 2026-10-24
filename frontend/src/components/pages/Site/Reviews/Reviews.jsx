@@ -15,9 +15,9 @@ const SuccessToast = ({ visible }) => (
       gap: 12,
       padding: '14px 22px',
       borderRadius: 14,
-      background: 'linear-gradient(135deg, #003d38 0%, #005a52 100%)',
-      border: '1.5px solid rgba(0,176,165,0.45)',
-      boxShadow: '0 20px 60px -8px rgba(0,40,35,0.55), 0 0 0 1px rgba(0,176,165,0.12)',
+      background: 'linear-gradient(135deg, #2D3142 0%, #1a1c26 100%)',
+      border: '1.5px solid rgba(239, 131, 84, 0.45)',
+      boxShadow: '0 20px 60px -8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(239, 131, 84, 0.15)',
       color: '#fff',
       fontSize: 13,
       fontWeight: 600,
@@ -32,8 +32,8 @@ const SuccessToast = ({ visible }) => (
   >
     <div style={{
       width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-      background: 'linear-gradient(135deg, #00b0a5, #007a72)',
-      boxShadow: '0 4px 14px rgba(0,176,165,0.5)',
+      background: 'linear-gradient(135deg, #EF8354, #d96f40)',
+      boxShadow: '0 4px 14px rgba(239, 131, 84, 0.4)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">

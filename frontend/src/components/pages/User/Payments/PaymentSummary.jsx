@@ -29,10 +29,10 @@ const SummaryCard = ({ label, value, subtext, highlight }) => (
     <p
       className={`text-xl font-bold truncate ${
         highlight === "green"
-          ? "text-teal-600"
+          ? "text-[#2F9E44]"
           : highlight === "orange"
-          ? "text-orange-500"
-          : "text-gray-900"
+          ? "text-[#EF8354]"
+          : "text-[#2D3142]"
       }`}
     >
       {value}
@@ -62,7 +62,7 @@ const PaymentSummary = ({
       <div className="flex gap-6 divide-x divide-gray-100">
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 font-medium mb-2">Total Amount</p>
-            <p className="text-xl font-bold truncate text-teal-600">{totalAmount}</p>
+            <p className="text-xl font-bold truncate text-[#2D3142]">{totalAmount}</p>
             {baseAmount && additionalCharges > 0 ? (
               <div className="mt-1 flex flex-col gap-0.5">
                 <p className="text-xs text-gray-400">Base: LKR {baseAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p>

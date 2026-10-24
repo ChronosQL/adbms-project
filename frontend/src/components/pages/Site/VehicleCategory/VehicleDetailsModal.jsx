@@ -117,15 +117,15 @@ const VehicleDetailsModal = ({ isOpen, onClose, vehicle }) => {
                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 mb-5 border border-blue-100 flex flex-col md:flex-row justify-between items-center gap-4">
                             <div className="text-center md:text-left">
                                 <p className="text-sm text-gray-500">{"Daily Rental Price"}</p>
-                                <p className="text-4xl font-bold text-blue-600">
-                                    USD {vehicle.price_per_day}
-                                    <span className="text-lg text-gray-500 font-normal">{"/day"}</span>
+                                <p className="text-3xl font-bold text-[#EF8354]">
+                                    LKR {Number(vehicle.price_per_day).toLocaleString('en-LK')}
+                                    <span className="text-sm text-gray-500 font-normal">{" / day"}</span>
                                 </p>
                             </div>
                             <div className="text-center md:text-right text-sm text-gray-700 bg-white/60 p-3.5 rounded-xl border border-white shadow-sm w-full md:w-auto">
                                 <p className="font-bold text-gray-900 mb-1 border-b border-gray-200 pb-1">Package & Custom Tours</p>
-                                <p>Includes <span className="font-bold text-blue-700">{isLargeVanOrVan ? 125 : 150} km</span> / day</p>
-                                <p>Extra mileage: <span className="font-bold text-red-600">$0.5 / km</span></p>
+                                <p>Includes <span className="font-bold text-[#2D3142]">{isLargeVanOrVan ? 125 : 150} km</span> / day</p>
+                                <p>Extra mileage: <span className="font-bold text-[#EF8354]">LKR 150 / km</span></p>
                             </div>
                         </div>
 
@@ -210,8 +210,7 @@ const VehicleDetailsModal = ({ isOpen, onClose, vehicle }) => {
                         <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-gray-200">
                             <button
                                 onClick={onClose}
-                                className="flex-1 px-6 py-2.5 font-medium rounded-xl transition-colors"
-                                style={{ backgroundColor: '#ffffff', color: '#374151', border: '1px solid #d1d5db' }}
+                                className="flex-1 px-6 py-2.5 font-bold rounded-xl transition-all text-white bg-[#EF8354] hover:bg-[#4F5D75] shadow-md shadow-[#EF8354]/15 cursor-pointer"
                             >
                                 {"Close"}
                             </button>

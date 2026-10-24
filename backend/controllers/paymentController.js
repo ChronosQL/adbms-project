@@ -222,7 +222,7 @@ const getPaymentsForBooking = async (req, res) => {
 
   try {
     const { rows: bookingRows } = await db.query(`
-      SELECT b.booking_id, b.user_id, b.quoted_price, b.additional_charges, b.tour_type,
+      SELECT b.booking_id, b.user_id, b.booking_status, b.quoted_price, b.additional_charges, b.tour_type,
              b.start_date, b.end_date, b.start_location, b.end_location,
              b.category_id, b.vehicle_id, vc.category_name,
              v.name AS vehicle_name, v.vehicle_number
@@ -440,6 +440,7 @@ const getPaymentsForBooking = async (req, res) => {
     res.json({
       bookingId: bookingId,
       bookingReference: bookingRef,
+      bookingStatus: booking.booking_status,
       tourType: booking.tour_type,
       startLocation: booking.start_location,
       endLocation: booking.end_location,
@@ -514,14 +515,12 @@ const recordPayment = async (req, res) => {
       });
     }
 
-    if (resolvedMethod === 'CASH') {
-      const CASH_ALLOWED_STATUSES = ['TOUR_STARTED', 'COMPLETED'];
-      if (!CASH_ALLOWED_STATUSES.includes(booking.booking_status)) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({
-          message: `Cash payments can only be recorded when the tour status is TOUR_STARTED or COMPLETED. Current booking status is ${booking.booking_status}.`
-        });
-      }
+    const ALLOWED_RECORD_STATUSES = ['TOUR_STARTED', 'COMPLETED'];
+    if (!ALLOWED_RECORD_STATUSES.includes(booking.booking_status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        message: `Payments can only be recorded after the tour has started. Current booking status is ${booking.booking_status}.`
+      });
     }
 
     if (req.file) payload.slipUrl = await uploadPaymentFile(req.file);
@@ -573,9 +572,9 @@ const uploadPaymentSlip = async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(403).json({ message: 'Access denied: you can only submit payments for your own booking.' });
     }
-    if (['CANCELLED', 'CLOSED'].includes(booking.booking_status)) {
+    if (!['TOUR_STARTED', 'COMPLETED', 'CLOSED'].includes(booking.booking_status)) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ message: `Cannot upload payment receipt for a ${booking.booking_status.toLowerCase()} booking.` });
+      return res.status(400).json({ message: 'Payment options are only available after the tour has started.' });
     }
 
     const { rows: totals } = await client.query(

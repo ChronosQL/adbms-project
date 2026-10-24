@@ -50,14 +50,14 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters, pagination = null }) =>
         .rvg-toolbar-label {
           font-size: 10px; font-weight: 700;
           letter-spacing: 0.2em; text-transform: uppercase;
-          color: #5a8080; flex-shrink: 0;
+          color: #4F5D75; flex-shrink: 0;
         }
         .rvg-star-btn {
           display: inline-flex; align-items: center; gap: 4px;
           padding: 6px 14px; border-radius: 100px;
           font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
-          border: 1.5px solid rgba(0,176,165,0.22);
-          background: transparent; color: #3a5a5a;
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
+          background: transparent; color: #2D3142;
           cursor: pointer;
           transition: all 0.2s ease;
         }
@@ -65,7 +65,7 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters, pagination = null }) =>
         .rvg-star-btn.active {
           background: #EF8354; color: #fff;
           border-color: #EF8354;
-          box-shadow: 0 4px 14px rgba(0,176,165,0.35);
+          box-shadow: 0 4px 14px rgba(239, 131, 84, 0.35);
         }
 
         /* Sort select */
@@ -73,8 +73,8 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters, pagination = null }) =>
           margin-left: auto;
           padding: 8px 14px; border-radius: 10px;
           font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
-          border: 1.5px solid rgba(0,176,165,0.22);
-          background: #fff; color: #3a5a5a;
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
+          background: #fff; color: #2D3142;
           cursor: pointer; outline: none;
           transition: border-color 0.2s ease;
         }

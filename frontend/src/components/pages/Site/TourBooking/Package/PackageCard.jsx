@@ -162,8 +162,8 @@ const PackageCard = ({ pkg, onShowMore, index = 0, showBookButton = true, showDe
           text-overflow: ellipsis;
         }
         .pkc-dest-more {
-          background: rgba(0,176,165,0.7); backdrop-filter: blur(10px);
-          border: 1px solid rgba(255,255,255,0.2);
+          background: rgba(239, 131, 84, 0.85); backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.3);
           color: #fff; font-size: 10px; font-weight: 700;
           padding: 4px 10px; border-radius: 100px; white-space: nowrap;
           flex: 0 0 auto;
@@ -174,15 +174,15 @@ const PackageCard = ({ pkg, onShowMore, index = 0, showBookButton = true, showDe
 
         .pkc-title {
           font-size: 1.25rem; font-weight: 800;
-          color: #0d2b2b; letter-spacing: -0.03em;
+          color: #2D3142; letter-spacing: -0.03em;
           line-height: 1.2; margin-bottom: 8px;
           overflow-wrap: anywhere;
           word-break: break-word;
         }
 
         .pkc-desc {
-          font-size: 13.5px; font-weight: 300;
-          color: #4a7070; line-height: 1.7;
+          font-size: 13.5px; font-weight: 400;
+          color: #4F5D75; line-height: 1.7;
           margin-bottom: 16px;
           overflow-wrap: anywhere;
           word-break: break-word;
@@ -195,8 +195,8 @@ const PackageCard = ({ pkg, onShowMore, index = 0, showBookButton = true, showDe
         }
         .pkc-hl {
           padding: 4px 10px; border-radius: 100px;
-          background: rgba(0,176,165,0.07);
-          border: 1px solid rgba(0,176,165,0.18);
+          background: rgba(239, 131, 84, 0.08);
+          border: 1px solid rgba(239, 131, 84, 0.2);
           font-size: 10px; font-weight: 600; color: #EF8354;
           letter-spacing: 0.04em;
           overflow-wrap: anywhere;
@@ -206,7 +206,7 @@ const PackageCard = ({ pkg, onShowMore, index = 0, showBookButton = true, showDe
         /* Rule */
         .pkc-rule {
           height: 1px; margin-bottom: 18px;
-          background: linear-gradient(90deg, rgba(0,176,165,0.2), transparent);
+          background: linear-gradient(90deg, rgba(239, 131, 84, 0.2), transparent);
         }
 
         /* Actions */
@@ -219,21 +219,21 @@ const PackageCard = ({ pkg, onShowMore, index = 0, showBookButton = true, showDe
           letter-spacing: 0.1em; text-transform: uppercase;
           padding: 12px 16px; border-radius: 10px;
           text-decoration: none;
-          box-shadow: 0 4px 16px -4px rgba(0,176,165,0.45);
+          box-shadow: 0 4px 16px -4px rgba(239, 131, 84, 0.45);
           transition: all 0.25s ease;
         }
         .pkc-book-btn:hover { background: #4F5D75; transform: translateY(-1px); }
         .pkc-more-btn {
-          display: inline-flex; align-items: center; justify-content: center; gap-6px;
+          display: inline-flex; align-items: center; justify-content: center; gap: 6px;
           padding: 12px 16px; border-radius: 10px;
-          border: 1.5px solid rgba(0,176,165,0.25);
-          background: transparent; color: #3a5a5a;
+          border: 1.5px solid rgba(239, 131, 84, 0.3);
+          background: transparent; color: #2D3142;
           font-size: 11px; font-weight: 700;
           letter-spacing: 0.08em; text-transform: uppercase;
           cursor: pointer;
           transition: all 0.2s ease;
         }
-        .pkc-more-btn:hover { border-color: #EF8354; color: #EF8354; background: rgba(0,176,165,0.05); }
+        .pkc-more-btn:hover { border-color: #EF8354; color: #EF8354; background: rgba(239, 131, 84, 0.08); }
       `}</style>
 
       <div
