@@ -1,6 +1,7 @@
 const db = require('../db/connection');
 const PDFDocument = require('pdfkit');
 const { parsePagination } = require('../utils/paginate');
+const { extractBookingPayload, validateBookingPayload } = require('../dto/bookingDto');
 
 const formatDate = (val) => {
   if (!val) return null;
@@ -128,67 +129,21 @@ const resolveCategoryId = async (categoryId) => {
 };
 
 const createP2PBooking = async (req, res) => {
-  const {
-    tourType,
-    packageId,
-    startLocation,
-    endLocation,
-    pickupLat,
-    pickupLng,
-    dropoffLat,
-    dropoffLng,
-    selectedCities,
-    activities,
-    startDate,
-    endDate,
-    pickupTime,
-    totalDays,
-    daysRequired,
-    categoryId,
-    noOfAdults,
-    noOfChildren,
-    agesOfChildren,
-    babySeatNeeded,
-    luggage10kg,
-    luggage25kg,
-    luggage35kg,
-    luggageCustomCount,
-    luggageCustomItems,
-    customerName,
-    contactPlatform,
-    contactNumber,
-    contactPlatform2,
-    contactNumber2,
-    notes,
-    tourThoughts,
-  } = req.body;
-
-  const isPackageBooking = normalizeTourType(tourType) === 'PACKAGE';
-  if (normalizeTourType(tourType) === 'CUSTOM') {
-    return res.status(400).json({ message: 'Customized tour booking is no longer supported.' });
+  const payload = extractBookingPayload(req.body);
+  const validation = validateBookingPayload(payload, false);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
   }
 
-  if (!startDate || !endDate || !categoryId || !customerName || !(contactNumber || '').trim())
-    return res.status(400).json({ message: 'Missing required fields.' });
-
-  if (!isPackageBooking && (!startLocation || !endLocation))
-    return res.status(400).json({ message: 'Start and end location are required for P2P bookings.' });
-
-  if (isPackageBooking && !packageId)
-    return res.status(400).json({ message: 'packageId is required for package bookings.' });
-
-  if (!req.user?.id)
+  if (!req.user?.id) {
     return res.status(401).json({ message: 'Not authenticated.' });
+  }
 
-  const customItems = Array.isArray(luggageCustomItems) ? luggageCustomItems : [];
-  const customLuggageSummary = customItems.length
-    ? `Custom Luggage: ${customItems.map((item, i) => `Item ${i + 1}: ${item.weight || '?'}kg`).join(', ')}`
-    : null;
-  const fullTourThoughts = [tourThoughts || null, customLuggageSummary].filter(Boolean).join('\n') || null;
+  const isPackageBooking = payload.tourType === 'PACKAGE';
 
   let client;
   try {
-    const resolvedCategoryId = await resolveCategoryId(categoryId);
+    const resolvedCategoryId = await resolveCategoryId(payload.categoryId);
 
     client = await db.connect();
     await client.query('BEGIN');
@@ -208,32 +163,32 @@ const createP2PBooking = async (req, res) => {
        RETURNING booking_id`,
       [
         req.user.id,
-        customerName,
-        contactPlatform  || 'mobile',
-        contactNumber,
-        contactPlatform2 || null,
-        contactNumber2   || null,
+        payload.customerName,
+        payload.contactPlatform,
+        payload.contactNumber,
+        payload.contactPlatform2,
+        payload.contactNumber2,
         isPackageBooking ? 'PACKAGE' : 'P2P',
         resolvedCategoryId,
-        startDate,
-        endDate,
-        pickupTime        || null,
-        isPackageBooking ? null : startLocation,
-        isPackageBooking ? null : endLocation,
-        isPackageBooking ? null : (pickupLat || null),
-        isPackageBooking ? null : (pickupLng || null),
-        isPackageBooking ? null : (dropoffLat || null),
-        isPackageBooking ? null : (dropoffLng || null),
-        totalDays         || 1,
-        daysRequired      || 1,
-        luggage10kg       || 0,
-        luggage25kg       || 0,
-        luggage35kg       || 0,
-        noOfAdults        || 1,
-        noOfChildren      || 0,
-        agesOfChildren    || null,
-        notes             || null,
-        fullTourThoughts,
+        payload.startDate,
+        payload.endDate,
+        payload.pickupTime,
+        isPackageBooking ? null : payload.startLocation,
+        isPackageBooking ? null : payload.endLocation,
+        isPackageBooking ? null : payload.pickupLat,
+        isPackageBooking ? null : payload.pickupLng,
+        isPackageBooking ? null : payload.dropoffLat,
+        isPackageBooking ? null : payload.dropoffLng,
+        payload.totalDays,
+        payload.daysRequired,
+        payload.luggage10kg,
+        payload.luggage25kg,
+        payload.luggage35kg,
+        payload.noOfAdults,
+        payload.noOfChildren,
+        payload.agesOfChildren,
+        payload.notes,
+        payload.fullTourThoughts,
       ]
     );
 
@@ -416,57 +371,15 @@ const updateStatus = async (req, res) => {
 
 const updateBooking = async (req, res) => {
   const { id } = req.params;
-  const {
-    tourType,
-    startLocation,
-    endLocation,
-    pickupLat,
-    pickupLng,
-    dropoffLat,
-    dropoffLng,
-    selectedCities,
-    activities,
-    startDate,
-    endDate,
-    pickupTime,
-    totalDays,
-    daysRequired,
-    categoryId,
-    noOfAdults,
-    noOfChildren,
-    agesOfChildren,
-    luggage10kg,
-    luggage25kg,
-    luggage35kg,
-    luggageCustomCount,
-    luggageCustomItems,
-    customerName,
-    contactPlatform,
-    contactNumber,
-    contactPlatform2,
-    contactNumber2,
-    customerPhone,
-    notes,
-    tourThoughts,
-  } = req.body;
-
-  if (normalizeTourType(tourType) === 'CUSTOM') {
-    return res.status(400).json({ message: 'Customized tour booking is no longer supported.' });
+  const payload = extractBookingPayload(req.body);
+  const validation = validateBookingPayload(payload, true);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
   }
-
-  if (!startDate || !endDate || !categoryId || !customerName || !(contactNumber || customerPhone || '').trim())
-    return res.status(400).json({ message: 'Missing required fields.' });
-
-  const customItems = Array.isArray(luggageCustomItems) ? luggageCustomItems : [];
-  const customLuggageSummary = customItems.length
-    ? `Custom Luggage: ${customItems.map((item, i) => `Item ${i + 1}: ${item.weight || '?'}kg`).join(', ')}`
-    : null;
-
-  const fullTourThoughts = [tourThoughts || null, customLuggageSummary].filter(Boolean).join('\n') || null;
 
   let client;
   try {
-    const resolvedCategoryId = await resolveCategoryId(categoryId);
+    const resolvedCategoryId = await resolveCategoryId(payload.categoryId);
 
     client = await db.connect();
     await client.query('BEGIN');
@@ -504,15 +417,31 @@ const updateBooking = async (req, res) => {
            notes = $24, tour_thoughts = $25
        WHERE booking_id = $26`,
       [
-        customerName, contactPlatform  || 'mobile', contactNumber || customerPhone, contactPlatform2 || null, contactNumber2 || null,
+        payload.customerName,
+        payload.contactPlatform,
+        payload.contactNumber,
+        payload.contactPlatform2,
+        payload.contactNumber2,
         resolvedCategoryId,
-        startDate, endDate, pickupTime || null,
-        startLocation || null, endLocation || null,
-        pickupLat ?? null, pickupLng ?? null, dropoffLat ?? null, dropoffLng ?? null,
-        totalDays    || 1, daysRequired || 1,
-        luggage10kg  || 0, luggage25kg  || 0, luggage35kg || 0,
-        noOfAdults   || 1, noOfChildren || 0, agesOfChildren || null,
-        notes || null, fullTourThoughts,
+        payload.startDate,
+        payload.endDate,
+        payload.pickupTime,
+        payload.startLocation,
+        payload.endLocation,
+        payload.pickupLat,
+        payload.pickupLng,
+        payload.dropoffLat,
+        payload.dropoffLng,
+        payload.totalDays,
+        payload.daysRequired,
+        payload.luggage10kg,
+        payload.luggage25kg,
+        payload.luggage35kg,
+        payload.noOfAdults,
+        payload.noOfChildren,
+        payload.agesOfChildren,
+        payload.notes,
+        payload.fullTourThoughts,
         id,
       ]
     );

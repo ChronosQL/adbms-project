@@ -1,22 +1,19 @@
 const db = require('../db/connection');
 const { parsePagination } = require('../utils/paginate');
 
-const normalizeTourType = (value) => String(value || 'P2P').toUpperCase();
-const getBookingReference = (tourType, bookingId) => {
-  const type = normalizeTourType(tourType);
-  const typeCode = type === 'PACKAGE' ? 'PKG' : type === 'CUSTOM' ? 'CUS' : 'P2P';
-  return `CBT-${typeCode}-${bookingId}`;
-};
+const {
+  normalizeTourType,
+  getBookingReference,
+  formatLKR,
+  extractPaymentPayload,
+  validatePaymentPayload,
+} = require('../dto/paymentDto');
 
 const modifyDays = (dateStr, days) => {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   d.setDate(d.getDate() + days);
   return d.toISOString().split('T')[0];
-};
-
-const formatLKR = (val) => {
-  return `LKR ${Number(val).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const getAllPayments = async (req, res) => {
