@@ -18,6 +18,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   const [paymentData, setPaymentData] = useState(null);
   const [toast, setToast] = useState(null);
   const [payAmount, setPayAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const showToast = (message, type = 'success') => {
@@ -109,7 +110,11 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   }
 
   const handleUpload = async ({ file, notes }) => {
-    if (!file) return;
+    if (!paymentMethod) {
+      showToast("Choose cash or bank transfer for this payment.", "error");
+      return;
+    }
+    if (paymentMethod === 'BANK_TRANSFER' && !file) return;
 
     const amount = Number(payAmount);
     const payableAmount = Number(paymentData.payableAmount ?? remaining);
@@ -121,14 +126,15 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
     const formData = new FormData();
     formData.append('booking_id', bookingId);
     formData.append('installment', amount >= payableAmount ? 'FULL' : 'PARTIAL');
+    formData.append('payment_method', paymentMethod);
     formData.append('amount', amount.toFixed(2));
     formData.append('notes', notes || '');
-    formData.append('slip', file);
+    if (paymentMethod === 'BANK_TRANSFER' && file) formData.append('slip', file);
 
     try {
       setSubmitting(true);
       await uploadPaymentSlip(formData);
-      showToast("Payment slip uploaded successfully! Under review.", "success");
+      showToast("Payment submitted successfully. It is awaiting admin verification.", "success");
       try {
         const updated = await getPaymentsForBooking(bookingId);
         setPaymentData(updated);
@@ -149,13 +155,13 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   const pendingTx = paymentData.transactions.find(t => t.status === 'PENDING VERIFICATION');
 
   const uploadedMessageText = pendingTx 
-    ? "Payment slip uploaded!" 
+    ? "Payment submitted for verification"
     : (currentPaidInstallments.length > 0 
       ? `${currentPaidInstallments.map(i => i.type).join(' & ')} Paid`
       : null);
 
   const uploadedSubtextText = pendingTx
-    ? "Your payment proof is under verification by admin."
+    ? `Your ${pendingTx.method.toLowerCase()} payment is awaiting admin verification.`
     : (currentPaidInstallments.length > 0
       ? `LKR ${paid.toLocaleString('en-LK', { minimumFractionDigits: 2 })} successfully received and verified.`
       : null);
@@ -186,14 +192,14 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
               remainingAmount={`LKR ${remaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`}
               paymentStatus={paymentStatus}
               paidSubtext={paid > 0 ? `${paidPercent}% of total` : ''}
-              remainingSubtext={price > 0 ? `${remainingPercent}% remaining` : ''}
+              remainingSubtext={price > 0 ? `${remainingPercent}% due after approved payments` : ''}
               nextPaymentNote={paymentData.nextPaymentNote}
             />
 
             <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div><p className="text-xs text-gray-500">Approved payments</p><p className="font-semibold text-green-700 tabular-nums">LKR {paid.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
-              <div><p className="text-xs text-gray-500">Pending receipts</p><p className="font-semibold text-amber-700 tabular-nums">LKR {Number(paymentData.pendingAmount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
-              <div><p className="text-xs text-gray-500">Still to pay</p><p className="font-semibold text-[#EF8354] tabular-nums">LKR {remaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
+              <div><p className="text-xs text-gray-500">Pending verification</p><p className="font-semibold text-amber-700 tabular-nums">LKR {Number(paymentData.pendingAmount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
+              <div><p className="text-xs text-gray-500">Due after approved payments</p><p className="font-semibold text-[#EF8354] tabular-nums">LKR {remaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
             </div>
 
             {/* Two-column section */}
@@ -220,6 +226,8 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
                     uploadLabel="Upload Receipt Copy"
                     uploadSublabel="(Offline verification)"
                     amount={payAmount}
+                    paymentMethod={paymentMethod}
+                    onPaymentMethodChange={setPaymentMethod}
                     maxAmount={Number(paymentData.payableAmount ?? remaining)}
                     onAmountChange={setPayAmount}
                     submitting={submitting}
@@ -245,7 +253,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
               <div className="col-span-1 flex flex-col gap-4">
                 <PaymentReminders reminders={reminders} />
                 <PaymentInformation
-                  paymentMethod="Bank Transfer"
+                  paymentMethod={paymentMethod === 'CASH' ? 'Cash (admin verification)' : paymentMethod === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Select per payment'}
                   bankName="Commercial Bank"
                   accountNumber="1234 5678 9012"
                   accountName="Ceylon Best Tours (Pvt) Ltd"

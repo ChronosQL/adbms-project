@@ -72,7 +72,7 @@ const extractPaymentPayload = (body = {}) => {
     installment: body.installment ? String(body.installment).trim().toUpperCase() : null,
     amount: !amountText || !Number.isFinite(amountNum) ? null : amountNum,
     amountPrecisionValid: /^\d+(?:\.\d{1,2})?$/.test(amountText),
-    paymentMethod: body.payment_method || body.paymentMethod || 'CASH',
+    paymentMethod: String(body.payment_method || body.paymentMethod || 'CASH').trim().toUpperCase(),
     receivedDate: body.received_date || body.receivedDate || new Date().toISOString().slice(0, 10),
     slipUrl: (body.slip_url || body.slipUrl || '').trim() || null,
     notes: body.notes ? String(body.notes).trim() : null,
@@ -82,6 +82,9 @@ const extractPaymentPayload = (body = {}) => {
 const validatePaymentPayload = (payload) => {
   if (!payload.bookingId || !payload.installment || payload.amount === null || payload.amount <= 0 || !payload.amountPrecisionValid || !payload.receivedDate) {
     return { valid: false, message: 'All required payment fields (booking_id, installment, valid amount, received_date) must be provided.' };
+  }
+  if (!['CASH', 'BANK_TRANSFER'].includes(payload.paymentMethod)) {
+    return { valid: false, message: 'Select Cash or Bank Transfer as the payment method.' };
   }
   return { valid: true };
 };

@@ -82,7 +82,7 @@ const PaymentSummary = ({
         </div>
         <div className="pl-6 flex-1 min-w-0">
           <SummaryCard
-            label="Remaining Amount"
+            label="Due Balance"
             value={remainingAmount}
             subtext={remainingSubtext}
             highlight="orange"

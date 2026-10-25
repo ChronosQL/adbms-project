@@ -15,24 +15,13 @@ const {
 } = require('../dto/paymentDto');
 
 const COMPANY_NAME = 'Ceylon Best Tours';
-const validateInstallmentAmount = ({ installment, amountCents, availableCents, booking, categoryRows }) => {
+const validateInstallmentAmount = ({ installment, amountCents, availableCents }) => {
   const type = String(installment || '').toUpperCase();
   if (!['FULL', 'PARTIAL', 'DEPOSIT', 'FINAL', 'ADDITIONAL'].includes(type)) return 'Select a valid payment type.';
   if (amountCents > availableCents) return `Payment amount exceeds the currently payable balance (${fromCents(availableCents).toFixed(2)}).`;
   if (type === 'FULL' && amountCents !== availableCents) return `Full payment must equal the currently payable balance (${fromCents(availableCents).toFixed(2)}).`;
-  if (type === 'DEPOSIT' || type === 'FINAL') {
-    if (booking.tour_type === 'P2P') return 'Point-to-point bookings accept full or partial payments only.';
-    const baseCents = toCents(booking.quoted_price);
-    const depositCents = Math.round(baseCents / 2);
-    const scheduledCents = type === 'DEPOSIT' ? depositCents : baseCents - depositCents;
-    const paidCents = categoryRows.filter((r) => r.installment === type && ['APPROVED', 'PENDING'].includes(r.status)).reduce((sum, r) => sum + toCents(r.amount), 0);
-    if (amountCents > Math.max(0, scheduledCents - paidCents)) return `${type === 'DEPOSIT' ? 'Deposit' : 'Final payment'} amount exceeds the remaining scheduled installment.`;
-  }
-  if (type === 'ADDITIONAL') {
-    const paidCents = categoryRows.filter((r) => r.installment === type && ['APPROVED', 'PENDING'].includes(r.status)).reduce((sum, r) => sum + toCents(r.amount), 0);
-    const dueCents = Math.max(0, toCents(booking.additional_charges) - paidCents);
-    if (amountCents > dueCents) return `Additional payment exceeds the remaining additional charges (${fromCents(dueCents).toFixed(2)}).`;
-  }
+  // Legacy installment labels remain readable, but new payments are flexible
+  // contributions against the whole booking balance.
   return null;
 };
 
@@ -162,13 +151,6 @@ const downloadPaymentInvoice = async (req, res) => {
   }
 };
 
-const modifyDays = (dateStr, days) => {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-};
-
 const getAllPayments = async (req, res) => {
   const { page, limit, offset, buildPagination } = parsePagination(req.query, 15, 100);
   const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
@@ -238,7 +220,7 @@ const getPaymentsForBooking = async (req, res) => {
 
     const booking = bookingRows[0];
 
-    if (!isAdmin && booking.user_id !== userId) {
+    if (!isAdmin && Number(booking.user_id) !== Number(userId)) {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
@@ -258,7 +240,6 @@ const getPaymentsForBooking = async (req, res) => {
     const basePrice = fromCents(baseCents);
     const additionalCharges = fromCents(additionalCents);
     const price = fromCents(priceCents);
-    const tourType = booking.tour_type;
     const start_date = formatDate(booking.start_date);
     const end_date = formatDate(booking.end_date);
 
@@ -270,169 +251,25 @@ const getPaymentsForBooking = async (req, res) => {
     const pendingAmount = fromCents(pendingCents);
     const remainingAmount = fromCents(remainingCents);
 
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    const installments = [];
-    let nextPaymentNote = '';
-
-    if (price > 0) {
-      if (tourType === 'P2P') {
-        const approvedFull = paymentRows.find(p => p.installment === 'FULL' && p.status === 'APPROVED');
-
-        let status = 'PENDING';
-        let statusNote = 'Payment pending';
-
-        if (paidCents >= priceCents) {
-          status = 'PAID';
-          statusNote = `Paid on ${approvedFull && approvedFull.received_date ? formatDate(approvedFull.received_date) : todayStr}`;
-        } else if (pendingCents > 0) {
-          status = 'PENDING';
-          statusNote = 'Pending verification';
-        } else if (todayStr > end_date) {
-          status = 'OVERDUE';
-          statusNote = 'Payment overdue';
-        }
-
-        installments.push({
-          id: 1,
-          number: 1,
-          type: 'Full Payment',
-          typeLabel: '100% of total',
-          amount: formatLKR(price),
-          rawAmount: price,
-          dueDate: end_date,
-          dueDateNote: 'After the tour ends',
-          status: status,
-          statusNote: statusNote
-        });
-
-        if (status !== 'PAID' && status !== 'PENDING') {
-          nextPaymentNote = `Full payment of ${formatLKR(price)} is due on ${end_date} (After the tour ends).`;
-        } else if (status === 'PENDING') {
-          nextPaymentNote = 'Verification in progress for your uploaded full payment.';
-        } else {
-          nextPaymentNote = 'Fully paid. No outstanding balance.';
-        }
-      } else {
-        const depositAmt = fromCents(Math.round(baseCents * 0.5));
-        const finalAmt = fromCents(baseCents - Math.round(baseCents * 0.5));
-        const depositDueDate = modifyDays(start_date, 2);
-        const finalDueDate = modifyDays(end_date, -1);
-
-        const approvedDeposit = paymentRows.find(p => p.installment === 'DEPOSIT' && p.status === 'APPROVED');
-        const depositPaidCents = paymentRows.filter(p => p.installment === 'DEPOSIT' && p.status === 'APPROVED').reduce((sum, p) => sum + toCents(p.amount), 0);
-        const depositPendingCents = paymentRows.filter(p => p.installment === 'DEPOSIT' && p.status === 'PENDING').reduce((sum, p) => sum + toCents(p.amount), 0);
-
-        let depStatus = 'PENDING';
-        let depStatusNote = 'Payment pending';
-
-        if (depositPaidCents >= toCents(depositAmt)) {
-          depStatus = 'PAID';
-          depStatusNote = `Paid on ${approvedDeposit && approvedDeposit.received_date ? formatDate(approvedDeposit.received_date) : todayStr}`;
-        } else if (depositPendingCents > 0) {
-          depStatus = 'PENDING';
-          depStatusNote = 'Pending verification';
-        } else if (todayStr > depositDueDate) {
-          depStatus = 'OVERDUE';
-          depStatusNote = 'Payment overdue';
-        }
-
-        installments.push({
-          id: 1,
-          number: 1,
-          type: 'Deposit',
-          typeLabel: '50% of total',
-          amount: formatLKR(depositAmt),
-          rawAmount: depositAmt,
-          dueDate: depositDueDate,
-          dueDateNote: 'Within 2 days of tour start',
-          status: depStatus,
-          statusNote: depStatusNote
-        });
-
-        const approvedFinal = paymentRows.find(p => p.installment === 'FINAL' && p.status === 'APPROVED');
-        const finalPaidCents = paymentRows.filter(p => p.installment === 'FINAL' && p.status === 'APPROVED').reduce((sum, p) => sum + toCents(p.amount), 0);
-        const finalPendingCents = paymentRows.filter(p => p.installment === 'FINAL' && p.status === 'PENDING').reduce((sum, p) => sum + toCents(p.amount), 0);
-
-        let finalStatus = 'PENDING';
-        let finalStatusNote = 'Payment pending';
-
-        if (finalPaidCents >= toCents(finalAmt)) {
-          finalStatus = 'PAID';
-          finalStatusNote = `Paid on ${approvedFinal && approvedFinal.received_date ? formatDate(approvedFinal.received_date) : todayStr}`;
-        } else if (finalPendingCents > 0) {
-          finalStatus = 'PENDING';
-          finalStatusNote = 'Pending verification';
-        } else if (todayStr > finalDueDate) {
-          finalStatus = 'OVERDUE';
-          finalStatusNote = 'Payment overdue';
-        }
-
-        installments.push({
-          id: 2,
-          number: 2,
-          type: 'Final Payment',
-          typeLabel: 'Remaining 50%',
-          amount: formatLKR(finalAmt),
-          rawAmount: finalAmt,
-          dueDate: finalDueDate,
-          dueDateNote: 'Before the last day of tour',
-          status: finalStatus,
-          statusNote: finalStatusNote
-        });
-
-        let additionalStatus = 'PENDING';
-        let additionalStatusNote = 'Payment pending';
-        const additionalDueDate = end_date;
-
-        if (additionalCharges > 0) {
-          const approvedAdditional = paymentRows.find(p => p.installment === 'ADDITIONAL' && p.status === 'APPROVED');
-          const pendingAdditional = paymentRows.find(p => p.installment === 'ADDITIONAL' && p.status === 'PENDING');
-
-          if (approvedAdditional || paidAmount >= price) {
-            additionalStatus = 'PAID';
-            additionalStatusNote = `Paid on ${approvedAdditional && approvedAdditional.received_date ? formatDate(approvedAdditional.received_date) : todayStr}`;
-          } else if (pendingAdditional) {
-            additionalStatus = 'PENDING';
-            additionalStatusNote = 'Pending verification';
-          } else if (todayStr > additionalDueDate) {
-            additionalStatus = 'OVERDUE';
-            additionalStatusNote = 'Payment overdue';
-          }
-
-          installments.push({
-            id: 3,
-            number: 3,
-            type: 'Additional Charges',
-            typeLabel: 'Extra Mileage',
-            amount: formatLKR(additionalCharges),
-            rawAmount: additionalCharges,
-            dueDate: additionalDueDate,
-            dueDateNote: 'After the tour ends',
-            status: additionalStatus,
-            statusNote: additionalStatusNote
-          });
-        }
-
-        if (depStatus !== 'PAID' && depStatus !== 'PENDING') {
-          nextPaymentNote = `Deposit of ${formatLKR(depositAmt)} is due on ${depositDueDate} (Within 2 days of tour start).`;
-        } else if (depStatus === 'PENDING') {
-          nextPaymentNote = 'Verification in progress for deposit payment proof.';
-        } else if (finalStatus !== 'PAID' && finalStatus !== 'PENDING') {
-          nextPaymentNote = `Final payment of ${formatLKR(finalAmt)} is due on ${finalDueDate} (Before the last day of the tour).`;
-        } else if (finalStatus === 'PENDING') {
-          nextPaymentNote = 'Verification in progress for final payment proof.';
-        } else if (additionalCharges > 0 && additionalStatus !== 'PAID' && additionalStatus !== 'PENDING') {
-          nextPaymentNote = `Additional charges of ${formatLKR(additionalCharges)} are due.`;
-        } else if (additionalCharges > 0 && additionalStatus === 'PENDING') {
-          nextPaymentNote = 'Verification in progress for additional charges proof.';
-        } else {
-          nextPaymentNote = 'Fully paid. No outstanding balance.';
-        }
-      }
-    } else {
-      nextPaymentNote = 'Price is not yet quoted by admin.';
-    }
+    const installments = price > 0 ? [{
+      id: 1,
+      number: 1,
+      type: 'Booking Balance',
+      typeLabel: 'Flexible payments accepted',
+      amount: formatLKR(remainingAmount),
+      rawAmount: remainingAmount,
+      dueDate: end_date,
+      dueDateNote: 'Remaining booking balance',
+      status: remainingCents === 0 ? 'PAID' : 'PENDING',
+      statusNote: remainingCents === 0 ? 'Fully paid' : pendingCents > 0 ? 'Payment verification in progress' : 'Payment pending',
+    }] : [];
+    const nextPaymentNote = price <= 0
+      ? 'Price is not yet quoted by admin.'
+      : remainingCents === 0
+        ? 'Fully paid. No outstanding balance.'
+        : pendingCents > 0
+          ? `${formatLKR(pendingAmount)} is awaiting admin verification.`
+          : `${formatLKR(remainingAmount)} remains due.`;
 
     const bookingRef = getBookingReference(booking.tour_type, booking.booking_id);
     const transactions = paymentRows.map((p) => mapTransactionRow(p, bookingRef));
@@ -471,6 +308,9 @@ const recordPayment = async (req, res) => {
   }
   const adminId = req.user.id;
   const resolvedMethod = (payload.paymentMethod || 'CASH').toUpperCase();
+  if (!['CASH', 'BANK_TRANSFER'].includes(resolvedMethod)) {
+    return res.status(400).json({ message: 'Select Cash or Bank Transfer as the payment method.' });
+  }
   if (resolvedMethod === 'BANK_TRANSFER' && !req.file) {
     return res.status(400).json({ message: 'Upload the bank receipt file to record a bank transfer.' });
   }
@@ -499,14 +339,11 @@ const recordPayment = async (req, res) => {
               COALESCE(SUM(amount) FILTER (WHERE status = 'PENDING'), 0) AS pending
        FROM payment WHERE booking_id = $1`, [payload.bookingId]
     );
-    const { rows: categoryRows } = await client.query(
-      'SELECT installment, status, amount FROM payment WHERE booking_id = $1', [payload.bookingId]
-    );
     const totalCents = toCents(booking.quoted_price) + toCents(booking.additional_charges);
     const remainingCents = Math.max(0, totalCents - toCents(totals[0].paid) - toCents(totals[0].pending));
     const remainingBalance = fromCents(remainingCents);
 
-    const typeError = validateInstallmentAmount({ installment: payload.installment, amountCents: toCents(payload.amount), availableCents: remainingCents, booking, categoryRows });
+    const typeError = validateInstallmentAmount({ installment: payload.installment, amountCents: toCents(payload.amount), availableCents: remainingCents });
     if (typeError) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -546,6 +383,7 @@ const recordPayment = async (req, res) => {
 
 const uploadPaymentSlip = async (req, res) => {
   const { booking_id, installment = 'PARTIAL', amount, notes } = req.body;
+  const paymentMethod = String(req.body.payment_method || 'BANK_TRANSFER').trim().toUpperCase();
   const amountNum = Number(amount);
   const validPrecision = /^\d+(?:\.\d{1,2})?$/.test(String(amount ?? '').trim());
   const slipFile = req.file;
@@ -553,7 +391,12 @@ const uploadPaymentSlip = async (req, res) => {
   if (!booking_id || !Number.isFinite(amountNum) || amountNum <= 0 || !validPrecision) {
     return res.status(400).json({ message: 'booking_id and a positive payment amount are required.' });
   }
-  if (!slipFile) return res.status(400).json({ message: 'Payment receipt file is required.' });
+  if (!['CASH', 'BANK_TRANSFER'].includes(paymentMethod)) {
+    return res.status(400).json({ message: 'Select Cash or Bank Transfer as the payment method.' });
+  }
+  if (paymentMethod === 'BANK_TRANSFER' && !slipFile) {
+    return res.status(400).json({ message: 'Payment receipt file is required for bank transfers.' });
+  }
 
   const client = await db.connect();
   try {
@@ -582,30 +425,27 @@ const uploadPaymentSlip = async (req, res) => {
               COALESCE(SUM(amount) FILTER (WHERE status = 'PENDING'), 0) AS pending
        FROM payment WHERE booking_id = $1`, [booking_id]
     );
-    const { rows: categoryRows } = await client.query(
-      'SELECT installment, status, amount FROM payment WHERE booking_id = $1', [booking_id]
-    );
     const totalCents = toCents(booking.quoted_price) + toCents(booking.additional_charges);
     const availableCents = Math.max(0, totalCents - toCents(totals[0].paid) - toCents(totals[0].pending));
     const available = fromCents(availableCents);
-    const typeError = validateInstallmentAmount({ installment, amountCents: toCents(amountNum), availableCents, booking, categoryRows });
+    const typeError = validateInstallmentAmount({ installment, amountCents: toCents(amountNum), availableCents });
     if (typeError) {
       await client.query('ROLLBACK');
       return res.status(400).json({ message: typeError, remainingBalance: available });
     }
 
-    const slipUrl = await uploadPaymentFile(slipFile);
+    const slipUrl = slipFile ? await uploadPaymentFile(slipFile) : null;
 
     const { rows } = await client.query(`
       INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, status, slip_url, notes)
-      VALUES ($1, $2, $3, 'BANK_TRANSFER', CURRENT_DATE, 'PENDING', $4, $5) RETURNING payment_id
-    `, [booking_id, String(installment).toUpperCase(), amountNum, slipUrl, notes || 'Uploaded by Customer']);
+      VALUES ($1, $2, $3, $4, CURRENT_DATE, 'PENDING', $5, $6) RETURNING payment_id
+    `, [booking_id, String(installment).toUpperCase(), amountNum, paymentMethod, slipUrl, notes || `Customer submitted ${paymentMethod === 'CASH' ? 'cash payment claim' : 'bank transfer receipt'}`]);
     await client.query('COMMIT');
-    res.status(201).json({ message: 'Payment receipt uploaded successfully. Under review by admin.', payment_id: rows[0].payment_id });
+    res.status(201).json({ message: 'Payment submitted successfully. It is pending admin verification.', payment_id: rows[0].payment_id });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('uploadPaymentSlip error:', err);
-    res.status(500).json({ message: 'Failed to upload payment receipt.' });
+    res.status(500).json({ message: 'Failed to submit payment.' });
   } finally {
     client.release();
   }

@@ -23,9 +23,13 @@ const PaymentInformation = ({
 
       <div className="mb-4">
         <InfoRow label="Payment Method" value={paymentMethod} />
-        <InfoRow label="Bank Name" value={bankName} />
-        <InfoRow label="Account Number" value={accountNumber} />
-        <InfoRow label="Account Name" value={accountName} />
+        {paymentMethod === "Bank Transfer" && <>
+          <InfoRow label="Bank Name" value={bankName} />
+          <InfoRow label="Account Number" value={accountNumber} />
+          <InfoRow label="Account Name" value={accountName} />
+        </>}
+        {paymentMethod.startsWith("Cash") && <p className="text-xs text-gray-500 mt-3">Cash submissions are recorded after an administrator verifies the amount received.</p>}
+        {paymentMethod === "Select per payment" && <p className="text-xs text-gray-500 mt-3">Choose a method for each payment. You can use cash for one installment and bank transfer for another.</p>}
       </div>
 
       <button

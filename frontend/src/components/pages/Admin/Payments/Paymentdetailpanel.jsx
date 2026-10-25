@@ -195,8 +195,9 @@ export default function PaymentDetailPanel({
               <InfoRow label="Additional Charges" value={payment.additionalCharges} textPrimary={textPrimary} textSecondary={textSecondary} divider={divider} />
               <InfoRow label="Total Amount" value={payment.totalAmount} highlight textPrimary={textPrimary} textSecondary={textSecondary} divider={divider} />
               <InfoRow label="Approved Payments" value={payment.approvedAmount} textPrimary={textPrimary} textSecondary={textSecondary} divider={divider} />
-              <InfoRow label="Pending Receipts" value={payment.pendingAmount} textPrimary={textPrimary} textSecondary={textSecondary} divider={divider} />
-              <InfoRow label="Remaining Amount" value={payment.remainingAmount} highlight textPrimary={textPrimary} textSecondary={textSecondary} divider={divider} />
+              <InfoRow label="Pending Payments" value={payment.pendingAmount} textPrimary={textPrimary} textSecondary={textSecondary} divider={divider} />
+              <InfoRow label="Due Balance" value={payment.remainingAmount} highlight textPrimary={textPrimary} textSecondary={textSecondary} divider={divider} />
+              <InfoRow label="Available to Collect" value={payment.availableAmount || payment.remainingAmount} textPrimary={textPrimary} textSecondary={textSecondary} divider={divider} />
               <div className="pt-3">
                 <button
                   type="button"

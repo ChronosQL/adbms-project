@@ -203,6 +203,7 @@ test('Payment DTO: Reference formatting, amounts, and row mapping', () => {
     installment: 'DEPOSIT',
     amount: '12000.00',
     status: 'APPROVED',
+    payment_method: 'CASH',
   };
   const mapped = paymentDto.mapPaymentRow(paymentRow);
   assert.equal(mapped.id, 'PAY005');
@@ -212,18 +213,28 @@ test('Payment DTO: Reference formatting, amounts, and row mapping', () => {
   const txMapped = paymentDto.mapTransactionRow(paymentRow, 'CBT-PKG-101');
   assert.equal(txMapped.id, 'TX005');
   assert.equal(txMapped.status, 'VERIFIED');
+  assert.equal(txMapped.method, 'Cash');
+  assert.equal(paymentDto.mapTransactionRow({ ...paymentRow, payment_method: 'BANK_TRANSFER' }, 'CBT-PKG-101').method, 'Bank Transfer');
 });
 
-test('Payment DTO: accepts flexible installment amounts with two-decimal precision only', () => {
+test('Payment DTO: accepts cash and bank transfer payments with flexible amounts and two-decimal precision', () => {
   const payload = paymentDto.extractPaymentPayload({
-    booking_id: '12', installment: 'PARTIAL', amount: '250.50', received_date: '2026-10-24',
+    booking_id: '12', installment: 'PARTIAL', amount: '250.50', received_date: '2026-10-24', payment_method: 'cash',
   });
   assert.equal(paymentDto.validatePaymentPayload(payload).valid, true);
+  const bankPayload = paymentDto.extractPaymentPayload({
+    booking_id: '12', installment: 'PARTIAL', amount: '250.50', received_date: '2026-10-24', payment_method: 'BANK_TRANSFER',
+  });
+  assert.equal(paymentDto.validatePaymentPayload(bankPayload).valid, true);
 
   const invalidPrecision = paymentDto.extractPaymentPayload({
-    booking_id: '12', installment: 'PARTIAL', amount: '250.501', received_date: '2026-10-24',
+    booking_id: '12', installment: 'PARTIAL', amount: '250.501', received_date: '2026-10-24', payment_method: 'CASH',
   });
   assert.equal(paymentDto.validatePaymentPayload(invalidPrecision).valid, false);
+  const invalidMethod = paymentDto.extractPaymentPayload({
+    booking_id: '12', installment: 'PARTIAL', amount: '250.50', received_date: '2026-10-24', payment_method: 'CARD',
+  });
+  assert.equal(paymentDto.validatePaymentPayload(invalidMethod).valid, false);
 });
 
 // ==========================================

@@ -181,7 +181,8 @@ export default function PaymentApprovalsPage() {
       paymentType: `${payment.type} (${payment.typePercent})`,
       amountPaid: payment.amount,
       totalAmount: payment.totalAmount || payment.amount,
-      remainingAmount: payment.payableAmount || payment.remainingAmount || "–",
+      remainingAmount: payment.remainingAmount || payment.payableAmount || "–",
+      availableAmount: payment.payableAmount || payment.remainingAmount || "–",
       approvedAmount: payment.approvedAmount || "LKR 0.00",
       pendingAmount: payment.pendingAmount || "LKR 0.00",
       paymentMethod: payment.method,
@@ -817,7 +818,7 @@ export default function PaymentApprovalsPage() {
                           </span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
-                          <span style={{ color: t.textSecondary }}>Receipts pending review</span>
+                          <span style={{ color: t.textSecondary }}>Payments pending review</span>
                           <span style={{ fontWeight: 700, color: "#E3A857" }}>
                             LKR {pendingPaidBooking.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
                           </span>
@@ -837,7 +838,7 @@ export default function PaymentApprovalsPage() {
                         <p style={{ fontSize: 12, fontWeight: 700, color: t.textSecondary, marginBottom: 6 }}>Payment history</p>
                         {bookingPayments.map((payment) => (
                           <div key={payment.rawId} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "6px 0", fontSize: 11, borderBottom: `1px solid ${t.divider}` }}>
-                            <span style={{ color: t.textSecondary }}>{payment.date} · {payment.type} · {payment.status}</span>
+                            <span style={{ color: t.textSecondary }}>{payment.date} · {payment.type} · {payment.method} · {payment.status}</span>
                             <span style={{ color: t.textPrimary, fontWeight: 700, whiteSpace: "nowrap" }}>LKR {Number(payment.rawAmount || 0).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span>
                           </div>
                         ))}
@@ -977,9 +978,6 @@ export default function PaymentApprovalsPage() {
                         >
                           <option value="FULL">Full Payment</option>
                           <option value="PARTIAL">Partial Payment</option>
-                          <option value="DEPOSIT">Deposit</option>
-                          <option value="FINAL">Final Payment</option>
-                          <option value="ADDITIONAL">Additional Charges</option>
                         </select>
                       </div>
 
