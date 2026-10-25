@@ -118,8 +118,12 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
 
     const amount = Number(payAmount);
     const payableAmount = Number(paymentData.payableAmount ?? remaining);
-    if (!Number.isFinite(amount) || amount <= 0 || Math.round(amount * 100) > Math.round(payableAmount * 100)) {
-      showToast(`Enter an amount up to LKR ${payableAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}.`, "error");
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast("Please enter a valid positive payment amount.", "error");
+      return;
+    }
+    if (Math.round(amount * 100) > Math.round(payableAmount * 100)) {
+      showToast(`Warning: The entered amount (LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}) exceeds the remaining payable balance of LKR ${payableAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}.`, "warning");
       return;
     }
 
@@ -281,14 +285,18 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
         <div
           className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border transition-all duration-300 transform translate-y-0 scale-100 ${
             toast.type === 'error'
-              ? 'bg-red-50 border-red-100 text-red-800'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : toast.type === 'warning'
+              ? 'bg-amber-50 border-amber-300 text-amber-900'
               : toast.type === 'info'
-              ? 'bg-blue-50 border-blue-100 text-blue-800'
-              : 'bg-emerald-50 border-emerald-100 text-emerald-800'
+              ? 'bg-blue-50 border-blue-200 text-blue-800'
+              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
           }`}
         >
           {toast.type === 'success' ? (
             <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-bold shrink-0">✓</div>
+          ) : toast.type === 'warning' ? (
+            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs font-bold shrink-0">!</div>
           ) : toast.type === 'error' ? (
             <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold shrink-0">!</div>
           ) : (

@@ -2,12 +2,12 @@ import { useState, useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 // import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Send, Lock, MapPin, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Lock, MapPin, CheckCircle, AlertTriangle } from "lucide-react";
 import { AuthContext } from "../../../../../context/AuthContext";
 import { submitP2PBooking, updateBooking } from "../../../../../services/bookingService";
 import BookingStepIndicator from "../Booking/BookingStepIndicator";
 import { isValidPrimaryPhone } from "../../../../../utils/bookingValidation";
-import P2PTripStep from "./P2PTripStep";
+import P2PTripStep, { isSameP2PLocation } from "./P2PTripStep";
 import BookingPassengersStep from "../Booking/BookingPassengersStep";
 import BookingNotesStep from "../Booking/BookingNotesStep";
 import P2PReviewStep from "./P2PReviewStep";
@@ -139,7 +139,20 @@ const areChildAgesValid = (noOfChildren, agesOfChildren) => {
 // ─── Validation ───────────────────────────────────────────────────────────────
 const validateStep = (step, data) => {
   switch (step) {
-    case 0: return data.startLocation.trim() && data.endLocation.trim() && data.startDate && data.endDate && data.pickupTime;
+    case 0:
+      return (
+        Boolean(data.startLocation?.trim()) &&
+        Boolean(data.endLocation?.trim()) &&
+        !isSameP2PLocation(
+          data.startLocation,
+          data.endLocation,
+          { lat: data.pickupLat, lng: data.pickupLng },
+          { lat: data.dropoffLat, lng: data.dropoffLng }
+        ) &&
+        Boolean(data.startDate) &&
+        Boolean(data.endDate) &&
+        Boolean(data.pickupTime)
+      );
     case 1: return data.noOfAdults >= 1 && data.categoryId && areChildAgesValid(data.noOfChildren, data.agesOfChildren);
     case 2: return data.customerName.trim() && isValidPrimaryPhone(data.contactPlatform, data.contactNumber);
     case 3: return true;
@@ -219,12 +232,29 @@ const PointToPoint = () => {
   const [bookingId, setBookingId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [stepWarning, setStepWarning] = useState("");
 
   if (!user) return <GuestGuard navigate={navigate} />;
 
-  const handleChange = (field, value) => setData((prev) => ({ ...prev, [field]: value }));
+  const isSameLocation = isSameP2PLocation(
+    data.startLocation,
+    data.endLocation,
+    { lat: data.pickupLat, lng: data.pickupLng },
+    { lat: data.dropoffLat, lng: data.dropoffLng }
+  );
+
+  const handleChange = (field, value) => {
+    setStepWarning("");
+    setData((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleNext = () => {
+    if (currentStep === 0 && isSameLocation) {
+      setStepWarning("Starting place and ending destination cannot be the same. Please choose a different drop-off destination.");
+      return;
+    }
     if (validateStep(currentStep, data)) {
+      setStepWarning("");
       setCurrentStep((s) => {
         const next = s + 1;
         setMaxReachedStep((m) => Math.max(m, next));
@@ -232,7 +262,10 @@ const PointToPoint = () => {
       });
     }
   };
-  const handleBack = () => setCurrentStep((s) => s - 1);
+  const handleBack = () => {
+    setStepWarning("");
+    setCurrentStep((s) => s - 1);
+  };
 
   const CATEGORY_LABELS = {
     mini_car: "Mini Car", normal_car: "Normal Car", sedan_car: "Sedan Car",
@@ -290,7 +323,7 @@ const PointToPoint = () => {
     }
   };
  
-  const canProceed = validateStep(currentStep, data);
+  const canProceed = (currentStep === 0 && isSameLocation) ? true : validateStep(currentStep, data);
  
   return (
     <div className="min-h-screen bg-slate-50 pb-16">
@@ -342,7 +375,14 @@ const PointToPoint = () => {
 ]}
                     currentStep={currentStep}
                     maxReachedStep={maxReachedStep}
-                    onStepClick={(idx) => setCurrentStep(idx)}
+                    onStepClick={(idx) => {
+                      if (idx > currentStep && currentStep === 0 && isSameLocation) {
+                        setStepWarning("Starting place and ending destination cannot be the same. Please choose a different drop-off destination.");
+                        return;
+                      }
+                      setStepWarning("");
+                      setCurrentStep(idx);
+                    }}
                   />
  
                   <AnimatePresence mode="wait">
@@ -360,6 +400,17 @@ const PointToPoint = () => {
                     </motion.div>
                   </AnimatePresence>
  
+                  {/* Step Warning */}
+                  {stepWarning && (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 mt-6 text-xs font-semibold text-amber-900 shadow-xs">
+                      <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-bold text-amber-800">Route Selection Warning</p>
+                        <p className="mt-0.5 text-amber-700">{stepWarning}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Navigation */}
                   <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#EF8354]/10">
                     <button
