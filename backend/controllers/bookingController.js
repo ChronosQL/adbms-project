@@ -44,26 +44,16 @@ const createP2PBooking = async (req, res) => {
 
   const isPackageBooking = payload.tourType === 'PACKAGE';
 
-  let client;
   try {
-    const resolvedCategoryId = await resolveCategoryId(payload.categoryId);
-
-    client = await db.connect();
-    await client.query('BEGIN');
-
-    const { rows } = await client.query(
-      `INSERT INTO booking
-        (user_id, customer_name, contact_platform, contact_number, contact_platform2, contact_number2,
-         tour_type, category_id,
-         start_date, end_date, pickup_time,
-         start_location, end_location,
-         pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-         total_days, days_required,
-         luggage_10kg, luggage_25kg, luggage_35kg,
-         no_of_adults, no_of_children, ages_of_children,
-         notes, tour_thoughts)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
-       RETURNING booking_id`,
+    // Encapsulates atomic booking creation, category resolution, coordinate mapping (pickup_lat, dropoff_lng),
+    // and binds payload.packageId into booking_package via stored procedure sp_create_booking.
+    const { rows } = await db.query(
+      `SELECT * FROM sp_create_booking(
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+        $31
+      )`,
       [
         req.user.id,
         payload.customerName,
@@ -72,16 +62,16 @@ const createP2PBooking = async (req, res) => {
         payload.contactPlatform2,
         payload.contactNumber2,
         isPackageBooking ? 'PACKAGE' : 'P2P',
-        resolvedCategoryId,
+        String(payload.categoryId ?? ''),
         payload.startDate,
         payload.endDate,
         payload.pickupTime,
-        isPackageBooking ? null : payload.startLocation,
-        isPackageBooking ? null : payload.endLocation,
-        isPackageBooking ? null : payload.pickupLat,
-        isPackageBooking ? null : payload.pickupLng,
-        isPackageBooking ? null : payload.dropoffLat,
-        isPackageBooking ? null : payload.dropoffLng,
+        payload.startLocation,
+        payload.endLocation,
+        payload.pickupLat,
+        payload.pickupLng,
+        payload.dropoffLat,
+        payload.dropoffLng,
         payload.totalDays,
         payload.daysRequired,
         payload.luggage10kg,
@@ -92,44 +82,26 @@ const createP2PBooking = async (req, res) => {
         payload.agesOfChildren,
         payload.notes,
         payload.fullTourThoughts,
+        isPackageBooking ? (payload.packageId || null) : null,
+        payload.emergencyName || null,
+        payload.emergencyPhone || null,
+        payload.emergencyRelationship || null,
       ]
     );
 
     const bookingId = rows[0].booking_id;
-
-    if (isPackageBooking && payload.packageId) {
-      await client.query(
-        'INSERT INTO booking_package (booking_id, package_id) VALUES ($1, $2)',
-        [bookingId, payload.packageId]
-      );
-    }
-
-    if (payload.emergencyName || payload.emergencyPhone || payload.emergencyRelationship) {
-      await client.query(
-        `UPDATE "user"
-         SET emergency_name = COALESCE($1, emergency_name),
-             emergency_phone = COALESCE($2, emergency_phone),
-             emergency_relationship = COALESCE($3, emergency_relationship)
-         WHERE user_id = $4`,
-        [payload.emergencyName, payload.emergencyPhone, payload.emergencyRelationship, req.user.id]
-      );
-    }
-
-    await client.query('COMMIT');
+    const bookingRef = rows[0].booking_ref || getBookingReference(isPackageBooking ? 'PACKAGE' : 'P2P', bookingId);
 
     res.status(201).json({
       message: 'Booking submitted successfully.',
       bookingId,
       booking: { id: bookingId },
-      bookingRef: getBookingReference(isPackageBooking ? 'PACKAGE' : 'P2P', bookingId),
+      bookingRef,
     });
 
   } catch (err) {
     console.error('createP2PBooking error:', err);
-    if (client) await client.query('ROLLBACK');
     res.status(500).json({ message: 'Failed to create booking.' });
-  } finally {
-    if (client) client.release();
   }
 };
 
@@ -204,26 +176,22 @@ const setQuote = async (req, res) => {
     return res.status(400).json({ message: 'quotedPrice is required.' });
 
   try {
-    const { rowCount } = await db.query(
-      `UPDATE booking
-       SET quoted_price = $1, vehicle_id = $2, admin_note = $3,
-           booking_status = 'QUOTED', quoted_at = NOW()
-       WHERE booking_id = $4 AND booking_status = 'PENDING' AND quoted_at IS NULL`,
-      [quotedPrice, vehicleId || null, adminNote || null, id]
+    // Invokes sp_set_booking_quote which validates vehicle availability and performs atomic update:
+    // WHERE booking_id = $4 AND booking_status = 'PENDING' AND quoted_at IS NULL
+    const { rows } = await db.query(
+      `SELECT * FROM sp_set_booking_quote($1, $2, $3, $4)`,
+      [id, quotedPrice, vehicleId || null, adminNote || null]
     );
 
-    if (rowCount === 0) {
-      const { rows } = await db.query(
-        'SELECT booking_id, booking_status, quoted_at, quoted_price FROM booking WHERE booking_id = $1',
-        [id]
-      );
-      if (rows.length === 0) {
+    const result = rows[0] || {};
+    if (!result.success) {
+      if (result.message === 'Booking not found.') {
         return res.status(404).json({ message: 'Booking not found.' });
       }
       return res.status(409).json({
-        message: 'A quote has already been provided for this booking or it is no longer pending.',
-        currentStatus: rows[0].booking_status,
-        quotedPrice: rows[0].quoted_price,
+        message: result.message || 'A quote has already been provided for this booking or it is no longer pending.',
+        currentStatus: result.current_status,
+        quotedPrice: result.current_price,
       });
     }
 

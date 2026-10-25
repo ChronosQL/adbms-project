@@ -128,79 +128,49 @@ const createReview = async (req, res) => {
     return res.status(400).json({ message: validation.message });
   }
 
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    const { rows: userRows } = await pool.query(
+      'SELECT user_id FROM "user" WHERE LOWER(email) = LOWER($1)',
+      [payload.customerEmail]
+    );
 
-    const { rows: bookingRows } = await client.query(`
-      SELECT b.booking_id, b.user_id, b.booking_status
-      FROM booking b
-      INNER JOIN "user" u ON u.user_id = b.user_id
-      WHERE b.booking_id = $1 AND u.email = $2
-      LIMIT 1
-    `, [payload.bookingId, payload.customerEmail]);
-
-    if (bookingRows.length === 0) {
-      await client.query('ROLLBACK');
+    if (!userRows.length) {
       return res.status(404).json({ message: 'Booking not found for this user.' });
     }
 
-    const booking = bookingRows[0];
-    if (booking.booking_status !== 'COMPLETED') {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ message: 'Review allowed only for completed tours.' });
-    }
+    const userId = userRows[0].user_id;
 
-    const { rows: existing } = await client.query(
-      'SELECT review_id FROM review WHERE booking_id = $1 LIMIT 1',
-      [payload.bookingId]
+    // sp_submit_tour_review validates booking ownership, completion status, single review constraint,
+    // and batch inserts review images atomically
+    const { rows } = await pool.query(
+      `SELECT * FROM sp_submit_tour_review($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        userId,
+        payload.bookingId,
+        payload.stars,
+        payload.driverName || null,
+        payload.title || null,
+        payload.comment,
+        payload.images && payload.images.length > 0 ? payload.images : null,
+      ]
     );
-    if (existing.length > 0) {
-      await client.query('ROLLBACK');
-      return res.status(409).json({ message: 'Review already exists for this booking.' });
+
+    const result = rows[0] || {};
+    if (!result.success) {
+      let status = 400;
+      if (result.message?.includes('not found')) status = 404;
+      else if (result.message?.includes('already exists')) status = 409;
+      return res.status(status).json({ message: result.message });
     }
-
-    const { rows: insertReview } = await client.query(`
-      INSERT INTO review (
-        user_id,
-        booking_id,
-        rating,
-        driver_name,
-        title,
-        feedback
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING review_id
-    `, [
-      booking.user_id,
-      payload.bookingId,
-      payload.stars,
-      payload.driverName || null,
-      payload.title || null,
-      payload.comment,
-    ]);
-
-    const reviewId = insertReview[0].review_id;
-
-    for (const url of payload.images) {
-      await client.query(
-        'INSERT INTO review_image (review_id, image_url) VALUES ($1, $2)',
-        [reviewId, url]
-      );
-    }
-
-    await client.query('COMMIT');
 
     res.status(201).json({
       message: 'Review created successfully.',
-      reviewId,
+      reviewId: result.review_id,
       imageUrls: payload.images,
     });
   } catch (error) {
-    await client.query('ROLLBACK');
     console.error('createReview failed:', error);
     res.status(500).json({ message: 'Failed to create review.' });
-  } finally {
-    client.release();
   }
 };
 

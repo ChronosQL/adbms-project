@@ -314,70 +314,43 @@ const recordPayment = async (req, res) => {
   if (resolvedMethod === 'BANK_TRANSFER' && !req.file) {
     return res.status(400).json({ message: 'Upload the bank receipt file to record a bank transfer.' });
   }
-  const client = await db.connect();
+
   try {
-    await client.query('BEGIN');
-    const { rows: bookingRows } = await client.query(
-      'SELECT booking_id, booking_status, quoted_price, additional_charges FROM booking WHERE booking_id = $1 FOR UPDATE',
-      [payload.bookingId]
-    );
-    if (!bookingRows.length) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ message: 'Booking not found.' });
-    }
-
-    const booking = bookingRows[0];
-    if (booking.booking_status === 'CLOSED' || booking.booking_status === 'CANCELLED') {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
-        message: `Cannot record payment. Booking is already ${booking.booking_status.toLowerCase()}.`
-      });
-    }
-
-    const { rows: totals } = await client.query(
-      `SELECT COALESCE(SUM(amount) FILTER (WHERE status = 'APPROVED'), 0) AS paid,
-              COALESCE(SUM(amount) FILTER (WHERE status = 'PENDING'), 0) AS pending
-       FROM payment WHERE booking_id = $1`, [payload.bookingId]
-    );
-    const totalCents = toCents(booking.quoted_price) + toCents(booking.additional_charges);
-    const remainingCents = Math.max(0, totalCents - toCents(totals[0].paid) - toCents(totals[0].pending));
-    const remainingBalance = fromCents(remainingCents);
-
-    const typeError = validateInstallmentAmount({ installment: payload.installment, amountCents: toCents(payload.amount), availableCents: remainingCents });
-    if (typeError) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
-        message: typeError,
-        remainingBalance,
-      });
-    }
-
-    const ALLOWED_RECORD_STATUSES = ['TOUR_STARTED', 'COMPLETED'];
-    if (!ALLOWED_RECORD_STATUSES.includes(booking.booking_status)) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
-        message: `Payments can only be recorded after the tour has started. Current booking status is ${booking.booking_status}.`
-      });
-    }
-
     if (req.file) payload.slipUrl = await uploadPaymentFile(req.file);
 
-    const { rows } = await client.query(`
-      INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, recorded_by, status, slip_url, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, 'APPROVED', $7, $8) RETURNING payment_id
-    `, [payload.bookingId, payload.installment, payload.amount, resolvedMethod, payload.receivedDate, adminId, payload.slipUrl, payload.notes]);
+    // Atomic execution with balance calculation and lock:
+    // validates payment does not exceed currently payable balance
+    const { rows } = await db.query(
+      `SELECT * FROM sp_record_and_reconcile_payment($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        payload.bookingId,
+        payload.installment,
+        payload.amount,
+        resolvedMethod,
+        payload.receivedDate,
+        adminId,
+        'APPROVED',
+        payload.slipUrl,
+        payload.notes,
+      ]
+    );
 
-    await client.query('COMMIT');
+    const result = rows[0] || {};
+    if (!result.success) {
+      const status = result.message?.includes('not found') ? 404 : 400;
+      return res.status(status).json({
+        message: result.message || 'Payment amount exceeds the currently payable balance.',
+        remainingBalance: Number(result.remaining_balance || 0),
+      });
+    }
+
     res.status(201).json({
       message: 'Payment recorded successfully.',
-      payment_id: rows[0].payment_id
+      payment_id: result.payment_id,
     });
   } catch (err) {
-    await client.query('ROLLBACK');
     console.error('recordPayment error:', err);
     res.status(500).json({ message: 'Failed to record payment.' });
-  } finally {
-    client.release();
   }
 };
 
@@ -398,56 +371,53 @@ const uploadPaymentSlip = async (req, res) => {
     return res.status(400).json({ message: 'Payment receipt file is required for bank transfers.' });
   }
 
-  const client = await db.connect();
   try {
-    await client.query('BEGIN');
-    const { rows: bookingRows } = await client.query(
-      'SELECT booking_id, user_id, booking_status, quoted_price, additional_charges FROM booking WHERE booking_id = $1 FOR UPDATE',
+    const { rows: bookingRows } = await db.query(
+      'SELECT booking_id, user_id, booking_status FROM booking WHERE booking_id = $1',
       [booking_id]
     );
     if (!bookingRows.length) {
-      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Booking not found.' });
     }
     const booking = bookingRows[0];
     const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
     if (!isAdmin && Number(booking.user_id) !== Number(req.user.id)) {
-      await client.query('ROLLBACK');
       return res.status(403).json({ message: 'Access denied: you can only submit payments for your own booking.' });
-    }
-    if (!['TOUR_STARTED', 'COMPLETED', 'CLOSED'].includes(booking.booking_status)) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ message: 'Payment options are only available after the tour has started.' });
-    }
-
-    const { rows: totals } = await client.query(
-      `SELECT COALESCE(SUM(amount) FILTER (WHERE status = 'APPROVED'), 0) AS paid,
-              COALESCE(SUM(amount) FILTER (WHERE status = 'PENDING'), 0) AS pending
-       FROM payment WHERE booking_id = $1`, [booking_id]
-    );
-    const totalCents = toCents(booking.quoted_price) + toCents(booking.additional_charges);
-    const availableCents = Math.max(0, totalCents - toCents(totals[0].paid) - toCents(totals[0].pending));
-    const available = fromCents(availableCents);
-    const typeError = validateInstallmentAmount({ installment, amountCents: toCents(amountNum), availableCents });
-    if (typeError) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ message: typeError, remainingBalance: available });
     }
 
     const slipUrl = slipFile ? await uploadPaymentFile(slipFile) : null;
 
-    const { rows } = await client.query(`
-      INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, status, slip_url, notes)
-      VALUES ($1, $2, $3, $4, CURRENT_DATE, 'PENDING', $5, $6) RETURNING payment_id
-    `, [booking_id, String(installment).toUpperCase(), amountNum, paymentMethod, slipUrl, notes || `Customer submitted ${paymentMethod === 'CASH' ? 'cash payment claim' : 'bank transfer receipt'}`]);
-    await client.query('COMMIT');
-    res.status(201).json({ message: 'Payment submitted successfully. It is pending admin verification.', payment_id: rows[0].payment_id });
+    // sp_record_and_reconcile_payment verifies payment does not exceed the currently payable balance
+    const { rows } = await db.query(
+      `SELECT * FROM sp_record_and_reconcile_payment($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        booking_id,
+        String(installment).toUpperCase(),
+        amountNum,
+        paymentMethod,
+        null,
+        req.user.id,
+        'PENDING',
+        slipUrl,
+        notes || `Customer submitted ${paymentMethod === 'CASH' ? 'cash payment claim' : 'bank transfer receipt'}`,
+      ]
+    );
+
+    const result = rows[0] || {};
+    if (!result.success) {
+      return res.status(400).json({
+        message: result.message || 'Payment amount exceeds the currently payable balance.',
+        remainingBalance: Number(result.remaining_balance || 0),
+      });
+    }
+
+    res.status(201).json({
+      message: 'Payment submitted successfully. It is pending admin verification.',
+      payment_id: result.payment_id,
+    });
   } catch (err) {
-    await client.query('ROLLBACK');
     console.error('uploadPaymentSlip error:', err);
     res.status(500).json({ message: 'Failed to submit payment.' });
-  } finally {
-    client.release();
   }
 };
 

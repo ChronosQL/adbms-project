@@ -102,77 +102,59 @@ exports.createPackage = async (req, res) => {
     const packageImage = await uploadBufferToCloudinary(packageImageFile, 'package_uploads');
     const destFiles = req.files && req.files.destImages ? req.files.destImages : [];
 
-    const client = await db.connect();
-    try {
-      await client.query('BEGIN');
-
-      const { rows: pkgRows } = await client.query(
-        `INSERT INTO package (title, type, days, description, image_url, availability_status)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING package_id`,
-        [title, packageType, packageDaysLabel, description || null, packageImage, availabilityStatus]
-      );
-      const packageId = pkgRows[0].package_id;
-
-      for (let i = 0; i < destinations.length; i++) {
-        const dest = destinations[i] || {};
-        let fileForDest = null;
-        if (dest.imageIndex !== undefined && dest.imageIndex !== null && destFiles[dest.imageIndex]) {
-          fileForDest = destFiles[dest.imageIndex];
-        } else if (destFiles.length === destinations.length) {
-          fileForDest = destFiles[i];
-        }
-        const destImage = fileForDest ? await uploadBufferToCloudinary(fileForDest, 'package_uploads') : (dest.image || null);
-        const lat = (dest.latitude !== undefined && dest.latitude !== null && dest.latitude !== '')
-          ? parseFloat(dest.latitude)
-          : ((dest.lat !== undefined && dest.lat !== null && dest.lat !== '') ? parseFloat(dest.lat) : null);
-        const lng = (dest.longitude !== undefined && dest.longitude !== null && dest.longitude !== '')
-          ? parseFloat(dest.longitude)
-          : ((dest.lng !== undefined && dest.lng !== null && dest.lng !== '') ? parseFloat(dest.lng) : null);
-
-        const { rows: placeRows } = await client.query(
-          `INSERT INTO place (place_name, image_url, description, latitude, longitude) VALUES ($1, $2, $3, $4, $5) RETURNING place_id`,
-          [dest.name || null, destImage, dest.description || null, lat, lng]
-        );
-        const placeId = placeRows[0].place_id;
-
-        const dayNumber = dest.dayNumber || (i + 1);
-        await client.query(
-          `INSERT INTO package_place (package_id, place_id, day_number, latitude, longitude) VALUES ($1, $2, $3, $4, $5)`,
-          [packageId, placeId, dayNumber, lat, lng]
-        );
-
-        const activities = Array.isArray(dest.activities) ? dest.activities : [];
-        for (const act of activities) {
-          if (!act.name) continue;
-          const { rows: actRows } = await client.query(
-            `INSERT INTO activity (activity_name, phone, description) VALUES ($1, $2, $3) RETURNING activity_id`,
-            [act.name, act.phone || null, act.description || null]
-          );
-          const activityId = actRows[0].activity_id;
-          await client.query(
-            `INSERT INTO place_activity (place_id, activity_id) VALUES ($1, $2)`,
-            [placeId, activityId]
-          );
-        }
+    const enrichedDestinations = [];
+    for (let i = 0; i < destinations.length; i++) {
+      const dest = destinations[i] || {};
+      let fileForDest = null;
+      if (dest.imageIndex !== undefined && dest.imageIndex !== null && destFiles[dest.imageIndex]) {
+        fileForDest = destFiles[dest.imageIndex];
+      } else if (destFiles.length === destinations.length) {
+        fileForDest = destFiles[i];
       }
+      const destImage = fileForDest ? await uploadBufferToCloudinary(fileForDest, 'package_uploads') : (dest.image || null);
+      const lat = (dest.latitude !== undefined && dest.latitude !== null && dest.latitude !== '')
+        ? parseFloat(dest.latitude)
+        : ((dest.lat !== undefined && dest.lat !== null && dest.lat !== '') ? parseFloat(dest.lat) : null);
+      const lng = (dest.longitude !== undefined && dest.longitude !== null && dest.longitude !== '')
+        ? parseFloat(dest.longitude)
+        : ((dest.lng !== undefined && dest.lng !== null && dest.lng !== '') ? parseFloat(dest.lng) : null);
 
-      await client.query('COMMIT');
-
-      res.status(201).json({
-        package_id: packageId,
-        title,
-        type: toPackageTypeLabel(packageType),
-        days: toPackageDaysNumber(packageDaysLabel),
-        description: description || null,
-        image_url: packageImage,
-        availability_status: availabilityStatus,
+      enrichedDestinations.push({
+        name: dest.name || null,
+        image: destImage,
+        description: dest.description || null,
+        latitude: lat,
+        longitude: lng,
+        dayNumber: dest.dayNumber || (i + 1),
+        activities: Array.isArray(dest.activities) ? dest.activities : [],
       });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
     }
+
+    // sp_create_package_with_itinerary batch inserts dest.latitude and dest.longitude into package_place and activities
+    const { rows } = await db.query(
+      `SELECT * FROM sp_create_package_with_itinerary($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+      [
+        title,
+        packageType,
+        packageDaysLabel,
+        description || null,
+        packageImage,
+        availabilityStatus,
+        JSON.stringify(enrichedDestinations),
+      ]
+    );
+
+    const packageId = rows[0].package_id;
+
+    res.status(201).json({
+      package_id: packageId,
+      title,
+      type: toPackageTypeLabel(packageType),
+      days: toPackageDaysNumber(packageDaysLabel),
+      description: description || null,
+      image_url: packageImage,
+      availability_status: availabilityStatus,
+    });
   } catch (error) {
     console.error('createPackage failed:', error);
     res.status(500).json({ error: 'Failed to create package or upload its images.' });
