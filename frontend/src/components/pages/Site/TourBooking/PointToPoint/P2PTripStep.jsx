@@ -1,24 +1,40 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MapPin, Calendar, Clock, Search, X } from "lucide-react";
-import { SRI_LANKA_LOCATIONS } from "./sriLankaLocations.js";
+import { MapPin, Calendar, Clock, Search, X, Loader2, AlertTriangle } from "lucide-react";
+import { searchLocations } from "../../../../../services/locationService";
+
+export const isSameP2PLocation = (startLocation, endLocation, pickupCoords, dropoffCoords) => {
+  const start = (startLocation || "").trim().toLowerCase();
+  const end = (endLocation || "").trim().toLowerCase();
+  if (!start || !end) return false;
+  if (start === end) return true;
+  if (
+    pickupCoords?.lat != null &&
+    pickupCoords?.lng != null &&
+    dropoffCoords?.lat != null &&
+    dropoffCoords?.lng != null
+  ) {
+    const latDiff = Math.abs(Number(pickupCoords.lat) - Number(dropoffCoords.lat));
+    const lngDiff = Math.abs(Number(pickupCoords.lng) - Number(dropoffCoords.lng));
+    if (latDiff < 0.0001 && lngDiff < 0.0001) return true;
+  }
+  return false;
+};
 
 const inputClass =
   "w-full px-4 py-3 bg-white border border-[#EF8354]/15 rounded-xl text-[#2D3142] text-sm outline-none transition-all focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20";
 
 // ─── Keyboard-accessible Location Input ───────────────────────────────────────
-// - No category grouping: flat list so users can navigate with arrow keys
-// - Keyboard: ArrowDown/Up moves highlight, Enter selects, Escape closes
-// - Free-type is allowed: if user types a custom location and presses Enter
-//   with nothing highlighted, the typed value is accepted as-is
-const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
-  const [query,     setQuery]     = useState(value || "");
-  const [open,      setOpen]      = useState(false);
-  const [results,   setResults]   = useState([]);
+const LocationInput = ({ value, onChange, placeholder, pinColor, id, hasError = false }) => {
+  const [query, setQuery] = useState(value || "");
+  const [open, setOpen] = useState(false);
+  const [results, setResults] = useState([]);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [loading, setLoading] = useState(false);
 
   const containerRef = useRef(null);
-  const listRef      = useRef(null);
-  const inputRef     = useRef(null);
+  const listRef = useRef(null);
+  const inputRef = useRef(null);
+  const debounceRef = useRef(null);
 
   // Close on outside click
   useEffect(() => {
@@ -30,8 +46,10 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Sync if parent value changes (e.g. clear)
-  useEffect(() => { setQuery(value || ""); }, [value]);
+  // Sync if parent value changes
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
 
   // Scroll active item into view
   useEffect(() => {
@@ -40,27 +58,69 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
     if (item) item.scrollIntoView({ block: "nearest" });
   }, [activeIdx]);
 
-  const search = useCallback((val) => {
-    setQuery(val);
-    onChange(val);
-    if (!val.trim()) { setResults([]); setOpen(false); setActiveIdx(-1); return; }
-    const q   = val.toLowerCase();
-    const res = SRI_LANKA_LOCATIONS.filter(loc =>
-      loc.toLowerCase().includes(q)
-    ).slice(0, 15);
-    setResults(res);
-    setOpen(res.length > 0);
-    setActiveIdx(-1);
-  }, [onChange]);
+  const performSearch = useCallback(async (val) => {
+    setLoading(true);
+    try {
+      const items = await searchLocations(val);
+      setResults(items);
+      setOpen(items.length > 0);
+      setActiveIdx(-1);
+    } catch (err) {
+      console.warn("Location search error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const select = useCallback((loc) => {
-    setQuery(loc);
-    onChange(loc);
-    setOpen(false);
-    setResults([]);
-    setActiveIdx(-1);
-    inputRef.current?.focus();
-  }, [onChange]);
+  const search = (val) => {
+    setQuery(val);
+    onChange(val, null);
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (!val.trim()) {
+      setResults([]);
+      setOpen(false);
+      setActiveIdx(-1);
+      return;
+    }
+
+    debounceRef.current = setTimeout(() => {
+      performSearch(val);
+    }, 300);
+  };
+
+  const handleFocus = async () => {
+    if (results.length > 0) {
+      setOpen(true);
+    } else if (!query.trim()) {
+      setLoading(true);
+      try {
+        const hubs = await searchLocations("");
+        setResults(hubs);
+        setOpen(hubs.length > 0);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const select = useCallback(
+    (loc) => {
+      const label = typeof loc === "object" && loc.label ? loc.label : String(loc);
+      const coords =
+        typeof loc === "object" && loc.lat != null ? { lat: loc.lat, lng: loc.lng } : null;
+      setQuery(label);
+      onChange(label, coords);
+      setOpen(false);
+      setResults([]);
+      setActiveIdx(-1);
+      inputRef.current?.focus();
+    },
+    [onChange]
+  );
 
   const handleKeyDown = (e) => {
     if (!open && e.key !== "ArrowDown") return;
@@ -68,20 +128,22 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        if (!open && results.length > 0) { setOpen(true); return; }
-        setActiveIdx(i => Math.min(i + 1, results.length - 1));
+        if (!open && results.length > 0) {
+          setOpen(true);
+          return;
+        }
+        setActiveIdx((i) => Math.min(i + 1, results.length - 1));
         break;
       case "ArrowUp":
         e.preventDefault();
-        setActiveIdx(i => Math.max(i - 1, -1));
+        setActiveIdx((i) => Math.max(i - 1, -1));
         break;
       case "Enter":
         e.preventDefault();
         if (activeIdx >= 0 && results[activeIdx]) {
           select(results[activeIdx]);
         } else if (query.trim()) {
-          // Accept free-typed value as-is
-          onChange(query.trim());
+          onChange(query.trim(), null);
           setOpen(false);
         }
         break;
@@ -90,7 +152,6 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
         setActiveIdx(-1);
         break;
       case "Tab":
-        // Accept highlighted item on Tab if one is active
         if (activeIdx >= 0 && results[activeIdx]) {
           select(results[activeIdx]);
         }
@@ -103,7 +164,7 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
 
   const clear = () => {
     setQuery("");
-    onChange("");
+    onChange("", null);
     setResults([]);
     setOpen(false);
     setActiveIdx(-1);
@@ -123,19 +184,21 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
           aria-expanded={open}
           aria-activedescendant={activeIdx >= 0 ? `${id}-opt-${activeIdx}` : undefined}
           value={query}
-          onChange={e => search(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onChange={(e) => search(e.target.value)}
+          onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className={`${inputClass} pl-9 pr-9`}
+          className={`${inputClass} pl-9 pr-9 ${hasError ? "!border-amber-500 !ring-2 !ring-amber-400/25" : ""}`}
           autoComplete="off"
         />
-        {query ? (
+        {loading ? (
+          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#EF8354] animate-spin pointer-events-none" />
+        ) : query ? (
           <button
             type="button"
             aria-label="Clear"
             onClick={clear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]/70 hover:text-[#2D3142]/70"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]/70 hover:text-[#2D3142]/70 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -149,26 +212,62 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
           ref={listRef}
           role="listbox"
           id={`${id}-listbox`}
-          className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EF8354]/15 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto py-1"
+          className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EF8354]/15 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto py-1"
         >
-          {results.map((loc, i) => (
-            <li
-              key={loc}
-              id={`${id}-opt-${i}`}
-              role="option"
-              aria-selected={i === activeIdx}
-              onMouseDown={e => { e.preventDefault(); select(loc); }}
-              onMouseEnter={() => setActiveIdx(i)}
-              className={`flex items-center gap-2.5 px-4 py-2.5 text-sm cursor-pointer transition-colors ${
-                i === activeIdx
-                  ? "bg-[#EF8354]/8 text-[#EF8354]"
-                  : "text-[#2D3142] hover:bg-[#BFC0C0]"
-              }`}
-            >
-              <MapPin className={`w-3.5 h-3.5 flex-shrink-0 ${i === activeIdx ? "text-[#EF8354]" : "text-slate-300"}`} />
-              <span>{loc}</span>
+          {loading && results.length === 0 ? (
+            <li className="flex items-center justify-center gap-2 px-4 py-4 text-xs text-slate-400">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#EF8354]" />
+              <span>Searching locations across Sri Lanka...</span>
             </li>
-          ))}
+          ) : results.length === 0 ? (
+            <li className="px-4 py-3 text-xs text-slate-400 text-center">
+              No matching locations found in Sri Lanka.
+            </li>
+          ) : (
+            results.map((loc, i) => {
+              const label = loc.label || String(loc);
+              const shortName = loc.shortName || label.split(",")[0];
+              return (
+                <li
+                  key={`${label}-${i}`}
+                  id={`${id}-opt-${i}`}
+                  role="option"
+                  aria-selected={i === activeIdx}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    select(loc);
+                  }}
+                  onMouseEnter={() => setActiveIdx(i)}
+                  className={`flex items-center justify-between gap-3 px-4 py-2.5 text-sm cursor-pointer transition-colors ${
+                    i === activeIdx
+                      ? "bg-[#EF8354]/8 text-[#EF8354]"
+                      : "text-[#2D3142] hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <MapPin
+                      className={`w-3.5 h-3.5 flex-shrink-0 ${
+                        i === activeIdx ? "text-[#EF8354]" : "text-slate-300"
+                      }`}
+                    />
+                    <div className="truncate">
+                      <span className="font-semibold text-xs block text-slate-800 truncate">
+                        {shortName}
+                      </span>
+                      <span className="text-[11px] text-slate-400 block truncate">
+                        {label}
+                      </span>
+                    </div>
+                  </div>
+                  {loc.category && (
+                    <span className="text-[10px] font-semibold text-[#EF8354] uppercase tracking-wider px-2 py-0.5 rounded bg-[#EF8354]/10 shrink-0">
+                      {loc.category}
+                    </span>
+                  )}
+                </li>
+              );
+            })
+          )}
         </ul>
       )}
     </div>
@@ -177,8 +276,14 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
 
 // ─── Main Trip Step ────────────────────────────────────────────────────────────
 const P2PTripStep = ({ data, onChange }) => {
-  
   const today = new Date().toISOString().split("T")[0];
+
+  const isSameLocation = isSameP2PLocation(
+    data.startLocation,
+    data.endLocation,
+    { lat: data.pickupLat, lng: data.pickupLng },
+    { lat: data.dropoffLat, lng: data.dropoffLng }
+  );
 
   const handleDate = (val) => {
     onChange("startDate",    val);
@@ -208,7 +313,11 @@ const P2PTripStep = ({ data, onChange }) => {
             <LocationInput
               id="pickup-location"
               value={data.startLocation}
-              onChange={val => onChange("startLocation", val)}
+              onChange={(val, coords) => {
+                onChange("startLocation", val);
+                onChange("pickupLat", coords?.lat ?? null);
+                onChange("pickupLng", coords?.lng ?? null);
+              }}
               placeholder={"Search airport, city, hotel area…"}
               pinColor="text-[#EF8354]"
             />
@@ -234,11 +343,31 @@ const P2PTripStep = ({ data, onChange }) => {
             <LocationInput
               id="dropoff-location"
               value={data.endLocation}
-              onChange={val => onChange("endLocation", val)}
+              onChange={(val, coords) => {
+                onChange("endLocation", val);
+                onChange("dropoffLat", coords?.lat ?? null);
+                onChange("dropoffLng", coords?.lng ?? null);
+              }}
               placeholder={"Search tourist spot, city, beach…"}
               pinColor="text-red-400"
+              hasError={isSameLocation}
             />
           </div>
+
+          {/* Warning when Pickup and Drop-off are identical */}
+          {isSameLocation && (
+            <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 shadow-xs">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-amber-800">
+                  Starting Place and Ending Destination Cannot Be the Same
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                  Point-to-point transfers require different pickup and drop-off destinations. Please select a different drop-off destination from your pickup location.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -280,7 +409,7 @@ const P2PTripStep = ({ data, onChange }) => {
           </div>
         </div>
 
-        {data.startDate && data.pickupTime && (
+        {data.startDate && data.pickupTime && !isSameLocation && (
           <div className="mt-4 bg-[#EF8354]/8 border border-[#EF8354]/25 rounded-xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 bg-[#EF8354]/10 rounded-full flex items-center justify-center flex-shrink-0">
               <Calendar className="w-5 h-5 text-[#EF8354]" />

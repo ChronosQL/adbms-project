@@ -6,6 +6,7 @@
 
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import CategoryGrid from './CategoryGrid';
 import CategoryForm from './CategoryForm';
 import VehicleList from './VehicleList';
@@ -14,8 +15,13 @@ import VehicleDetailsModal from './VehicleDetailsModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import FleetStats from './FleetStatus';
 import { vehicleService, categoryService } from '../../../../services/vehicleService';
+import { BRAND, getTheme } from '../AdminDashboard/adminTheme';
 
 const FleetManagement = () => {
+    const outletCtx = useOutletContext();
+    const dark = outletCtx?.dark ?? false;
+    const t = getTheme(dark);
+
     // State management
     const [categories, setCategories] = useState([]);
     const [vehicles, setVehicles] = useState([]);
@@ -273,7 +279,7 @@ const FleetManagement = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen transition-colors duration-200" style={{ background: t.pageBg }}>
             {/* Toast Notification */}
             {toast && (
                 <div
@@ -300,17 +306,25 @@ const FleetManagement = () => {
                 {/* Page Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-800">Fleet Management</h1>
-                        <p className="text-gray-500 mt-1">Manage your vehicle fleet and categories</p>
+                        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight" style={{ color: t.textPrimary, fontFamily: "'Montserrat', sans-serif" }}>
+                            Fleet Management
+                        </h1>
+                        <p className="text-xs md:text-sm font-medium mt-1" style={{ color: t.textSecondary }}>
+                            Manage your luxury vehicle fleet, specifications, and category classifications
+                        </p>
                     </div>
                     <div className="flex flex-wrap gap-3">
                         <button
                             onClick={handleAddCategory}
                             type="button"
-                            className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-6 py-2.5 font-medium shadow-sm transition-colors"
-                            style={{ backgroundColor: '#ffffff', color: '#374151', borderColor: '#d1d5db' }}
+                            className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-5 py-2.5 text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+                            style={{
+                                backgroundColor: dark ? '#242838' : '#ffffff',
+                                color: t.textPrimary,
+                                borderColor: t.cardBorder,
+                            }}
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                             </svg>
                             Add Category
@@ -318,10 +332,10 @@ const FleetManagement = () => {
                         <button
                             onClick={handleAddVehicle}
                             type="button"
-                            className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-6 py-2.5 font-medium shadow-md transition-colors"
-                            style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
+                            className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-xs transition-all hover:brightness-105 active:scale-[0.98] cursor-pointer"
+                            style={{ backgroundColor: '#EF8354' }}
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                             </svg>
                             Add Vehicle
@@ -330,7 +344,7 @@ const FleetManagement = () => {
                 </div>
 
                 {/* Fleet Statistics */}
-                <FleetStats stats={stats} loading={statsLoading} />
+                <FleetStats stats={stats} loading={statsLoading} dark={dark} t={t} />
 
                 {/* Category Grid */}
                 <CategoryGrid
@@ -340,6 +354,8 @@ const FleetManagement = () => {
                     onEditCategory={handleEditCategory}
                     onDeleteCategory={handleDeleteCategoryClick}
                     loading={categoriesLoading}
+                    dark={dark}
+                    t={t}
                 />
 
                 {/* Vehicle List */}
@@ -350,6 +366,8 @@ const FleetManagement = () => {
                     onView={handleViewVehicle}
                     onEdit={handleEditVehicle}
                     onDelete={handleDeleteClick}
+                    dark={dark}
+                    t={t}
                 />
             </div>
 

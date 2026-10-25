@@ -1,7 +1,7 @@
 // components/pages/Admin/AdminDashboard/AdminDashboard.jsx
 import { useState, useEffect, useMemo } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
-import { CalendarCheck, Clock, CheckCircle2, MessageSquare } from "lucide-react";
+import { CalendarCheck, Clock, CheckCircle2, MessageSquare, BarChart3, ArrowRight } from "lucide-react";
 import { useBookings } from "../../../../context/BookingsContext";
 import { useMessages } from "../../../../context/useMessages.js";
 import { STATUS_CFG, getRoute } from "../ApproveBookings/BookingConstants";
@@ -156,9 +156,9 @@ export default function AdminDashboard() {
   }, [bookings]);
 
   const quickActions = [
-    { label: `Review Pending (${pendingCount})`, onClick: () => navigate("/admin/approve-bookings") },
-    { label: `Reply to Messages (${unreadMessages})`, onClick: () => navigate("/admin/messages") },
-    { label: "Open Reports", onClick: () => navigate("/admin/report") },
+    { label: "Review Pending", count: pendingCount, icon: CalendarCheck, onClick: () => navigate("/admin/approve-bookings") },
+    { label: "Reply to Messages", count: unreadMessages, icon: MessageSquare, onClick: () => navigate("/admin/messages") },
+    { label: "Open Reports", icon: BarChart3, onClick: () => navigate("/admin/report") },
   ];
 
   if (loading) {
@@ -195,10 +195,23 @@ export default function AdminDashboard() {
             </div>
             <button
               onClick={() => navigate("/admin/approve-bookings")}
-              className="px-4 py-1.5 rounded-lg border text-[12px] font-bold transition-all duration-200"
-              style={{ fontFamily: FONT.body, color: BRAND.coral, borderColor: t.dark ? "rgba(255,255,255,0.1)" : "#EEE0D8" }}
-              onMouseEnter={e => e.currentTarget.style.background = t.hoverBg}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              className="px-4 py-1.5 rounded-lg border text-[12px] font-bold transition-all duration-200 cursor-pointer shadow-xs"
+              style={{
+                fontFamily: FONT.body,
+                color: BRAND.coral,
+                background: "rgba(239, 131, 84, 0.08)",
+                borderColor: "rgba(239, 131, 84, 0.3)",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = BRAND.coral;
+                e.currentTarget.style.color = "#FFFFFF";
+                e.currentTarget.style.borderColor = BRAND.coral;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "rgba(239, 131, 84, 0.08)";
+                e.currentTarget.style.color = BRAND.coral;
+                e.currentTarget.style.borderColor = "rgba(239, 131, 84, 0.3)";
+              }}
             >
               View All →
             </button>
@@ -238,7 +251,7 @@ export default function AdminDashboard() {
                         <td style={{ fontFamily: FONT.body, color: t.textSecondary }} className="px-5 py-3.5 text-[13px] max-w-[200px] truncate">{tourLabel}</td>
                         <td style={{ fontFamily: FONT.body, color: t.textSecondary }} className="px-5 py-3.5 text-[12px] whitespace-nowrap">{b.startDate || "—"}</td>
                         <td style={{ fontFamily: FONT.body, color: t.textPrimary }} className="px-5 py-3.5 text-[13px] font-bold font-mono">
-                          {b.quotedPrice ? `$${b.quotedPrice}` : "—"}
+                          {b.quotedPrice ? `LKR ${Number(b.quotedPrice).toLocaleString('en-LK')}` : "—"}
                         </td>
                         <td className="px-5 py-3.5"><StatusChip status={b.status} /></td>
                       </tr>
@@ -257,20 +270,59 @@ export default function AdminDashboard() {
           {statusBars.map((s, i) => (
             <ProgressBar key={s.label} label={s.label} pct={s.pct} color={s.color} t={t} delay={i * 150} />
           ))}
-          <div className="mt-5 p-4 rounded-xl border" style={{ background: t.dark ? "rgba(239,131,84,0.12)" : "rgba(239,131,84,0.07)", borderColor: t.dark ? "rgba(239,131,84,0.3)" : "rgba(239,131,84,0.2)" }}>
+          <div className="mt-6 p-4 rounded-xl border" style={{ background: t.dark ? "rgba(255,255,255,0.02)" : "#FAFAFB", borderColor: t.cardBorder }}>
             <p style={{ fontFamily: FONT.heading, color: BRAND.coral }} className="text-[11px] font-extrabold uppercase tracking-wider mb-3">Quick Actions</p>
-            {quickActions.map(action => (
-              <button
-                key={action.label}
-                onClick={action.onClick}
-                className="w-full text-left px-3 py-2 rounded-lg border text-[13px] font-medium mb-2 last:mb-0 transition-all duration-150"
-                style={{ fontFamily: FONT.body, color: t.textSecondary, borderColor: t.dark ? "rgba(255,255,255,0.08)" : "#EEE0D8" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND.coral; e.currentTarget.style.color = BRAND.coral; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = t.dark ? "rgba(255,255,255,0.08)" : "#EEE0D8"; e.currentTarget.style.color = t.textSecondary; }}
-              >
-                {action.label}
-              </button>
-            ))}
+            <div className="space-y-2">
+              {quickActions.map(action => {
+                const Icon = action.icon;
+                return (
+                  <button
+                    key={action.label}
+                    onClick={action.onClick}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl border text-[13px] font-semibold transition-all duration-200 group active:scale-[0.98] cursor-pointer"
+                    style={{
+                      fontFamily: FONT.body,
+                      background: t.cardBg,
+                      borderColor: t.cardBorder,
+                      color: t.textPrimary,
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = BRAND.coral;
+                      e.currentTarget.style.boxShadow = "0 2px 8px rgba(239,131,84,0.12)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = t.cardBorder;
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                        style={{ background: t.dark ? "rgba(239,131,84,0.15)" : "rgba(239,131,84,0.1)", color: BRAND.coral }}
+                      >
+                        <Icon size={14} strokeWidth={2.2} />
+                      </div>
+                      <span className="truncate">{action.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {action.count !== undefined && action.count > 0 && (
+                        <span
+                          className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+                          style={{
+                            background: BRAND.coral,
+                            color: "#FFFFFF",
+                            fontFamily: FONT.body,
+                          }}
+                        >
+                          {action.count}
+                        </span>
+                      )}
+                      <ArrowRight size={14} className="text-[#BFC0C0] group-hover:text-[#EF8354] transition-colors group-hover:translate-x-0.5 duration-150" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

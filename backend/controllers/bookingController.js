@@ -1,110 +1,19 @@
 const db = require('../db/connection');
 const PDFDocument = require('pdfkit');
-
-const formatDate = (val) => {
-  if (!val) return null;
-  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-  const dt = new Date(val);
-  if (Number.isNaN(dt.getTime())) return null;
-
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, '0');
-  const d = String(dt.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-const normalizeTourType = (value) => String(value || 'P2P').toUpperCase();
+const { parsePagination } = require('../utils/paginate');
+const {
+  formatDate,
+  normalizeTourType,
+  getBookingReference,
+  formatMoney,
+  getPaymentScheduleLines,
+  extractBookingPayload,
+  validateBookingPayload,
+  mapBooking,
+} = require('../dto/bookingDto');
 
 const COMPANY_NAME = 'Ceylon Best Tours';
-
-const getBookingReference = (tourType, bookingId) => {
-  const type = normalizeTourType(tourType);
-  const typeCode = type === 'PACKAGE' ? 'PKG' : 'P2P';
-  return `CBT-${typeCode}-${bookingId}`;
-};
-
-const formatMoney = (value) => {
-  if (value === null || value === undefined) return 'N/A';
-  const n = Number(value);
-  if (Number.isNaN(n)) return 'N/A';
-  return `USD ${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-};
-
-const getPaymentScheduleLines = (tourType, quotedPrice) => {
-  const amount = Number(quotedPrice || 0);
-  const isP2P = normalizeTourType(tourType) === 'P2P';
-
-  if (isP2P) {
-    return [
-      `FULL: ${formatMoney(amount)} payable before trip start.`,
-    ];
-  }
-
-  const deposit = amount * 0.3;
-  const final = amount - deposit;
-
-  return [
-    `DEPOSIT (30%): ${formatMoney(deposit)} payable at confirmation.`,
-    `FINAL (70%): ${formatMoney(final)} payable before trip start.`,
-  ];
-};
-
 const PDF_ALLOWED_STATUSES = ['ACCEPTED', 'CONFIRMED', 'TOUR_STARTED', 'COMPLETED', 'CLOSED'];
-
-const mapBooking = (row) => ({
-  id:             row.booking_id,
-  userId:         row.user_id,
-  customerName:   row.customer_name,
-  contactPlatform:  row.contact_platform  || null,
-  contactNumber:    row.contact_number    || null,
-  customerPhone:    row.contact_number    || null,
-  contactPlatform2: row.contact_platform2 || null,
-  contactNumber2:   row.contact_number2   || null,
-  emergencyName:    row.emergency_name    || null,
-  emergencyPhone:   row.emergency_phone   || null,
-  emergencyRelationship: row.emergency_relationship || null,
-  customerEmail:  row.email || null,
-  tourType:       row.tour_type,
-  categoryId:     row.category_id,
-  categoryName:   row.category_name || null,
-  packageId:      row.package_id    || null,
-  packageName:    row.package_name  || null,
-  vehicleId:      row.vehicle_id    || null,
-  assignedVehicle: row.vehicle_name ? {
-    name:        row.vehicle_name,
-    plateNumber: row.vehicle_number || '—',
-    type:        row.category_name  || '',
-  } : null,
-  startDate:      formatDate(row.start_date),
-  endDate:        formatDate(row.end_date),
-  pickupTime:     row.pickup_time   || null,
-  bookingDate:    formatDate(row.booking_date),
-  startLocation:  row.start_location || null,
-  endLocation:    row.end_location   || null,
-  totalDays:      row.total_days,
-  daysRequired:   row.days_required,
-  luggage10kg:        row.luggage_10kg        || 0,
-  luggage25kg:        row.luggage_25kg        || 0,
-  luggage35kg:        row.luggage_35kg        || 0,
-  luggageCustomCount: 0,
-  luggageCustomDesc:  null,
-  noOfAdults:         row.no_of_adults,
-  noOfChildren:       row.no_of_children,
-  agesOfChildren:     row.ages_of_children || null,
-  quotedPrice:        row.quoted_price ? parseFloat(row.quoted_price) : null,
-  additionalCharges:  row.additional_charges ? parseFloat(row.additional_charges) : 0,
-  notes:              row.notes        || null,
-  tourThoughts:       row.tour_thoughts || null,
-  adminNote:          row.admin_note    || null,
-  status:             row.booking_status,
-  quotedAt:           row.quoted_at,
-  confirmedAt:        row.confirmed_at,
-  tourStartedAt:      row.tour_started_at,
-  completedAt:        row.completed_at,
-  closedAt:           row.closed_at,
-  bookingRef:         getBookingReference(row.tour_type, row.booking_id),
-  itinerary:          [],
-});
 
 const resolveCategoryId = async (categoryId) => {
   if (!isNaN(categoryId) && categoryId !== '') {
@@ -123,150 +32,105 @@ const resolveCategoryId = async (categoryId) => {
 };
 
 const createP2PBooking = async (req, res) => {
-  const {
-    tourType,
-    packageId,
-    startLocation,
-    endLocation,
-    selectedCities,
-    activities,
-    startDate,
-    endDate,
-    pickupTime,
-    totalDays,
-    daysRequired,
-    categoryId,
-    noOfAdults,
-    noOfChildren,
-    agesOfChildren,
-    babySeatNeeded,
-    luggage10kg,
-    luggage25kg,
-    luggage35kg,
-    luggageCustomCount,
-    luggageCustomItems,
-    customerName,
-    contactPlatform,
-    contactNumber,
-    contactPlatform2,
-    contactNumber2,
-    notes,
-    tourThoughts,
-  } = req.body;
-
-  const isPackageBooking = normalizeTourType(tourType) === 'PACKAGE';
-  if (normalizeTourType(tourType) === 'CUSTOM') {
-    return res.status(400).json({ message: 'Customized tour booking is no longer supported.' });
+  const payload = extractBookingPayload(req.body);
+  const validation = validateBookingPayload(payload, false);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
   }
 
-  if (!startDate || !endDate || !categoryId || !customerName || !(contactNumber || '').trim())
-    return res.status(400).json({ message: 'Missing required fields.' });
-
-  if (!isPackageBooking && (!startLocation || !endLocation))
-    return res.status(400).json({ message: 'Start and end location are required for P2P bookings.' });
-
-  if (isPackageBooking && !packageId)
-    return res.status(400).json({ message: 'packageId is required for package bookings.' });
-
-  if (!req.user?.id)
+  if (!req.user?.id) {
     return res.status(401).json({ message: 'Not authenticated.' });
+  }
 
-  const customItems = Array.isArray(luggageCustomItems) ? luggageCustomItems : [];
-  const customLuggageSummary = customItems.length
-    ? `Custom Luggage: ${customItems.map((item, i) => `Item ${i + 1}: ${item.weight || '?'}kg`).join(', ')}`
-    : null;
-  const fullTourThoughts = [tourThoughts || null, customLuggageSummary].filter(Boolean).join('\n') || null;
+  const isPackageBooking = payload.tourType === 'PACKAGE';
 
-  let client;
   try {
-    const resolvedCategoryId = await resolveCategoryId(categoryId);
-
-    client = await db.connect();
-    await client.query('BEGIN');
-
-    const { rows } = await client.query(
-      `INSERT INTO booking
-        (user_id, customer_name, contact_platform, contact_number, contact_platform2, contact_number2,
-         tour_type, category_id,
-         start_date, end_date, pickup_time,
-         start_location, end_location,
-         total_days, days_required,
-         luggage_10kg, luggage_25kg, luggage_35kg,
-         no_of_adults, no_of_children, ages_of_children,
-         notes, tour_thoughts)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
-       RETURNING booking_id`,
+    // Encapsulates atomic booking creation, category resolution, coordinate mapping (pickup_lat, dropoff_lng),
+    // and binds payload.packageId into booking_package via stored procedure sp_create_booking.
+    const { rows } = await db.query(
+      `SELECT * FROM sp_create_booking(
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+        $31
+      )`,
       [
         req.user.id,
-        customerName,
-        contactPlatform  || 'mobile',
-        contactNumber,
-        contactPlatform2 || null,
-        contactNumber2   || null,
+        payload.customerName,
+        payload.contactPlatform,
+        payload.contactNumber,
+        payload.contactPlatform2,
+        payload.contactNumber2,
         isPackageBooking ? 'PACKAGE' : 'P2P',
-        resolvedCategoryId,
-        startDate,
-        endDate,
-        pickupTime        || null,
-        isPackageBooking ? null : startLocation,
-        isPackageBooking ? null : endLocation,
-        totalDays         || 1,
-        daysRequired      || 1,
-        luggage10kg       || 0,
-        luggage25kg       || 0,
-        luggage35kg       || 0,
-        noOfAdults        || 1,
-        noOfChildren      || 0,
-        agesOfChildren    || null,
-        notes             || null,
-        fullTourThoughts,
+        String(payload.categoryId ?? ''),
+        payload.startDate,
+        payload.endDate,
+        payload.pickupTime,
+        payload.startLocation,
+        payload.endLocation,
+        payload.pickupLat,
+        payload.pickupLng,
+        payload.dropoffLat,
+        payload.dropoffLng,
+        payload.totalDays,
+        payload.daysRequired,
+        payload.luggage10kg,
+        payload.luggage25kg,
+        payload.luggage35kg,
+        payload.noOfAdults,
+        payload.noOfChildren,
+        payload.agesOfChildren,
+        payload.notes,
+        payload.fullTourThoughts,
+        isPackageBooking ? (payload.packageId || null) : null,
+        payload.emergencyName || null,
+        payload.emergencyPhone || null,
+        payload.emergencyRelationship || null,
       ]
     );
 
     const bookingId = rows[0].booking_id;
-
-    if (isPackageBooking) {
-      await client.query(
-        'INSERT INTO booking_package (booking_id, package_id) VALUES ($1, $2)',
-        [bookingId, packageId]
-      );
-    }
-
-    await client.query('COMMIT');
+    const bookingRef = rows[0].booking_ref || getBookingReference(isPackageBooking ? 'PACKAGE' : 'P2P', bookingId);
 
     res.status(201).json({
       message: 'Booking submitted successfully.',
       bookingId,
       booking: { id: bookingId },
-      bookingRef: getBookingReference(isPackageBooking ? 'PACKAGE' : 'P2P', bookingId),
+      bookingRef,
     });
 
   } catch (err) {
     console.error('createP2PBooking error:', err);
-    if (client) await client.query('ROLLBACK');
     res.status(500).json({ message: 'Failed to create booking.' });
-  } finally {
-    if (client) client.release();
   }
 };
 
 const getMyBookings = async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      `SELECT b.*, u.email, u.emergency_name, u.emergency_phone, u.emergency_relationship,
-              vc.category_name,
-              p.package_id, p.title AS package_name
-       FROM booking b
-       JOIN "user" u ON u.user_id = b.user_id
-       LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-       LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-       LEFT JOIN package p ON p.package_id = bp.package_id
-       WHERE b.user_id = $1
-       ORDER BY b.booking_date DESC, b.booking_id DESC`,
-      [req.user.id]
-    );
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 10, 50);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
 
-    res.json({ bookings: rows.map(mapBooking) });
+  try {
+    let query = `
+      SELECT *, COUNT(*) OVER()::integer AS total_count
+      FROM v_booking_details
+      WHERE user_id = $1
+      ORDER BY booking_date DESC, booking_id DESC
+    `;
+    const params = [req.user.id];
+
+    if (isPaginated) {
+      query += ` LIMIT $2 OFFSET $3`;
+      params.push(limit, offset);
+    }
+
+    const { rows } = await db.query(query, params);
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    const bookings = rows.map(mapBooking);
+    bookings.pagination = pagination;
+
+    res.json({ bookings, pagination });
   } catch (err) {
     console.error('getMyBookings error:', err);
     res.status(500).json({ message: 'Failed to load bookings.' });
@@ -274,22 +138,30 @@ const getMyBookings = async (req, res) => {
 };
 
 const getAllBookings = async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      `SELECT b.*, u.email, u.emergency_name, u.emergency_phone, u.emergency_relationship,
-              vc.category_name,
-              p.package_id, p.title AS package_name,
-              v.vehicle_number, v.name AS vehicle_name
-       FROM booking b
-       JOIN "user" u ON u.user_id = b.user_id
-       LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-       LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-       LEFT JOIN package p ON p.package_id = bp.package_id
-       LEFT JOIN vehicle v ON v.vehicle_id = b.vehicle_id
-       ORDER BY b.booking_date DESC, b.booking_id DESC`
-    );
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 10, 100);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
 
-    res.json({ bookings: rows.map(mapBooking) });
+  try {
+    let query = `
+      SELECT *, COUNT(*) OVER()::integer AS total_count
+      FROM v_booking_details
+      ORDER BY booking_date DESC, booking_id DESC
+    `;
+    const params = [];
+
+    if (isPaginated) {
+      query += ` LIMIT $1 OFFSET $2`;
+      params.push(limit, offset);
+    }
+
+    const { rows } = await db.query(query, params);
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    const bookings = rows.map(mapBooking);
+    bookings.pagination = pagination;
+
+    res.json({ bookings, pagination });
   } catch (err) {
     console.error('getAllBookings error:', err);
     res.status(500).json({ message: 'Failed to load bookings.' });
@@ -304,16 +176,24 @@ const setQuote = async (req, res) => {
     return res.status(400).json({ message: 'quotedPrice is required.' });
 
   try {
-    const { rowCount } = await db.query(
-      `UPDATE booking
-       SET quoted_price = $1, vehicle_id = $2, admin_note = $3,
-           booking_status = 'QUOTED', quoted_at = NOW()
-       WHERE booking_id = $4`,
-      [quotedPrice, vehicleId || null, adminNote || null, id]
+    // Invokes sp_set_booking_quote which validates vehicle availability and performs atomic update:
+    // WHERE booking_id = $4 AND booking_status = 'PENDING' AND quoted_at IS NULL
+    const { rows } = await db.query(
+      `SELECT * FROM sp_set_booking_quote($1, $2, $3, $4)`,
+      [id, quotedPrice, vehicleId || null, adminNote || null]
     );
 
-    if (rowCount === 0)
-      return res.status(404).json({ message: 'Booking not found.' });
+    const result = rows[0] || {};
+    if (!result.success) {
+      if (result.message === 'Booking not found.') {
+        return res.status(404).json({ message: 'Booking not found.' });
+      }
+      return res.status(409).json({
+        message: result.message || 'A quote has already been provided for this booking or it is no longer pending.',
+        currentStatus: result.current_status,
+        quotedPrice: result.current_price,
+      });
+    }
 
     res.json({ message: 'Quote sent to customer.' });
   } catch (err) {
@@ -373,53 +253,15 @@ const updateStatus = async (req, res) => {
 
 const updateBooking = async (req, res) => {
   const { id } = req.params;
-  const {
-    tourType,
-    startLocation,
-    endLocation,
-    selectedCities,
-    activities,
-    startDate,
-    endDate,
-    pickupTime,
-    totalDays,
-    daysRequired,
-    categoryId,
-    noOfAdults,
-    noOfChildren,
-    agesOfChildren,
-    luggage10kg,
-    luggage25kg,
-    luggage35kg,
-    luggageCustomCount,
-    luggageCustomItems,
-    customerName,
-    contactPlatform,
-    contactNumber,
-    contactPlatform2,
-    contactNumber2,
-    customerPhone,
-    notes,
-    tourThoughts,
-  } = req.body;
-
-  if (normalizeTourType(tourType) === 'CUSTOM') {
-    return res.status(400).json({ message: 'Customized tour booking is no longer supported.' });
+  const payload = extractBookingPayload(req.body);
+  const validation = validateBookingPayload(payload, true);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
   }
-
-  if (!startDate || !endDate || !categoryId || !customerName || !(contactNumber || customerPhone || '').trim())
-    return res.status(400).json({ message: 'Missing required fields.' });
-
-  const customItems = Array.isArray(luggageCustomItems) ? luggageCustomItems : [];
-  const customLuggageSummary = customItems.length
-    ? `Custom Luggage: ${customItems.map((item, i) => `Item ${i + 1}: ${item.weight || '?'}kg`).join(', ')}`
-    : null;
-
-  const fullTourThoughts = [tourThoughts || null, customLuggageSummary].filter(Boolean).join('\n') || null;
 
   let client;
   try {
-    const resolvedCategoryId = await resolveCategoryId(categoryId);
+    const resolvedCategoryId = await resolveCategoryId(payload.categoryId);
 
     client = await db.connect();
     await client.query('BEGIN');
@@ -447,23 +289,55 @@ const updateBooking = async (req, res) => {
            category_id = $6,
            start_date = $7, end_date = $8, pickup_time = $9,
            start_location = $10, end_location = $11,
-           total_days = $12, days_required = $13,
-           luggage_10kg = $14, luggage_25kg = $15, luggage_35kg = $16,
-           no_of_adults = $17, no_of_children = $18, ages_of_children = $19,
-           notes = $20, tour_thoughts = $21
-       WHERE booking_id = $22`,
+           pickup_lat = COALESCE($12, pickup_lat),
+           pickup_lng = COALESCE($13, pickup_lng),
+           dropoff_lat = COALESCE($14, dropoff_lat),
+           dropoff_lng = COALESCE($15, dropoff_lng),
+           total_days = $16, days_required = $17,
+           luggage_10kg = $18, luggage_25kg = $19, luggage_35kg = $20,
+           no_of_adults = $21, no_of_children = $22, ages_of_children = $23,
+           notes = $24, tour_thoughts = $25
+       WHERE booking_id = $26`,
       [
-        customerName, contactPlatform  || 'mobile', contactNumber || customerPhone, contactPlatform2 || null, contactNumber2 || null,
+        payload.customerName,
+        payload.contactPlatform,
+        payload.contactNumber,
+        payload.contactPlatform2,
+        payload.contactNumber2,
         resolvedCategoryId,
-        startDate, endDate, pickupTime || null,
-        startLocation || null, endLocation || null,
-        totalDays    || 1, daysRequired || 1,
-        luggage10kg  || 0, luggage25kg  || 0, luggage35kg || 0,
-        noOfAdults   || 1, noOfChildren || 0, agesOfChildren || null,
-        notes || null, fullTourThoughts,
+        payload.startDate,
+        payload.endDate,
+        payload.pickupTime,
+        payload.startLocation,
+        payload.endLocation,
+        payload.pickupLat,
+        payload.pickupLng,
+        payload.dropoffLat,
+        payload.dropoffLng,
+        payload.totalDays,
+        payload.daysRequired,
+        payload.luggage10kg,
+        payload.luggage25kg,
+        payload.luggage35kg,
+        payload.noOfAdults,
+        payload.noOfChildren,
+        payload.agesOfChildren,
+        payload.notes,
+        payload.fullTourThoughts,
         id,
       ]
     );
+
+    if (payload.emergencyName || payload.emergencyPhone || payload.emergencyRelationship) {
+      await client.query(
+        `UPDATE "user"
+         SET emergency_name = COALESCE($1, emergency_name),
+             emergency_phone = COALESCE($2, emergency_phone),
+             emergency_relationship = COALESCE($3, emergency_relationship)
+         WHERE user_id = $4`,
+        [payload.emergencyName, payload.emergencyPhone, payload.emergencyRelationship, req.user.id]
+      );
+    }
 
     await client.query('COMMIT');
     res.json({ message: 'Booking updated successfully.' });
@@ -487,15 +361,7 @@ const downloadBookingConfirmationPdf = async (req, res) => {
 
   try {
     const { rows } = await db.query(
-      `SELECT b.*,
-              vc.category_name,
-              p.title AS package_name
-       FROM booking b
-       LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-       LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-       LEFT JOIN package p ON p.package_id = bp.package_id
-       WHERE b.booking_id = $1
-       LIMIT 1`,
+      `SELECT * FROM v_booking_details WHERE booking_id = $1 LIMIT 1`,
       [bookingId]
     );
 
@@ -599,10 +465,9 @@ const updateAdditionalCharges = async (req, res) => {
 
   try {
     const { rows } = await db.query(`
-      SELECT b.quoted_price,
-             COALESCE((SELECT SUM(amount) FROM payment WHERE booking_id = b.booking_id AND status = 'APPROVED'), 0) AS total_paid
-      FROM booking b
-      WHERE b.booking_id = $1
+      SELECT quoted_price, total_paid
+      FROM v_booking_financial_summary
+      WHERE booking_id = $1
     `, [id]);
 
     if (rows.length === 0) {

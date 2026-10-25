@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Hero       from "./Hero";
 import PackageFilters    from "./PackageFilters";
 import PackageGrid       from "./PackageGrid";
 import PackageDetailModal from "./PackageDetailModal";
+import Pagination from "../../../../common/Pagination";
 import { buildApiUrl } from '../../../../../config/api';
 
 const Package = () => {
   const [activeType, setActiveType] = useState('All');
   const [activeDays, setActiveDays] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [dataVersion, setDataVersion] = useState(0);
   const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const handlePackagesChanged = () => {
@@ -27,33 +31,42 @@ const Package = () => {
 
   useEffect(() => {
     (async () => {
+      setLoading(true);
       try {
         const params = new URLSearchParams();
         if (activeType && activeType !== 'All') params.set('type', activeType);
         if (activeDays && activeDays !== 'All') params.set('days', String(activeDays));
+        params.set('page', String(currentPage));
+        params.set('limit', '9');
         const query = params.toString() ? `?${params.toString()}` : '';
         const res = await fetch(buildApiUrl(`/packages${query}`));
         if (res.ok) {
           const data = await res.json();
-          setPackages(Array.isArray(data) ? data : data.packages || []);
+          if (Array.isArray(data)) {
+            setPackages(data);
+            setPagination(data.pagination || null);
+          } else {
+            setPackages(data.packages || []);
+            setPagination(data.pagination || null);
+          }
         }
       } catch (e) {
         console.error('Failed to load packages', e);
+      } finally {
+        setLoading(false);
       }
     })();
-  }, [dataVersion]);
+  }, [activeType, activeDays, currentPage, dataVersion]);
 
-  // Re-filters automatically whenever data or filters change
-  // packages is provided by the server already filtered according to activeType/activeDays
-
+  // Reset page when filter changes
   const handleTypeChange = (type) => {
     setActiveType(type);
-    setDataVersion(v => v + 1); // trigger reload with new filter
+    setCurrentPage(1);
   };
 
   const handleDaysChange = (days) => {
     setActiveDays(days);
-    setDataVersion(v => v + 1); // trigger reload with new filter
+    setCurrentPage(1);
   };
 
   const handleShowMore = async (pkg) => {
@@ -98,7 +111,7 @@ const Package = () => {
         activeDays={activeDays}
         onTypeChange={handleTypeChange}
         onDaysChange={handleDaysChange}
-        total={packages.length}
+        total={pagination?.totalItems ?? packages.length}
       />
 
       {/* Package grid */}
@@ -106,6 +119,17 @@ const Package = () => {
         packages={packages}
         onShowMore={handleShowMore}
       />
+
+      {/* Server-side Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+          <Pagination
+            pagination={pagination}
+            onPageChange={(p) => setCurrentPage(p)}
+            scrollToRef={true}
+          />
+        </div>
+      )}
 
       {/* Detail modal */}
       {selectedPkg && (

@@ -1,72 +1,196 @@
 const db = require('../db/connection');
+const PDFDocument = require('pdfkit');
+const cloudinary = require('cloudinary').v2;
+const { parsePagination } = require('../utils/paginate');
+const { toCents, fromCents } = require('../utils/money');
 
-const normalizeTourType = (value) => String(value || 'P2P').toUpperCase();
-const getBookingReference = (tourType, bookingId) => {
-  const type = normalizeTourType(tourType);
-  const typeCode = type === 'PACKAGE' ? 'PKG' : type === 'CUSTOM' ? 'CUS' : 'P2P';
-  return `CBT-${typeCode}-${bookingId}`;
+const {
+  getBookingReference,
+  formatDate,
+  formatLKR,
+  mapPaymentRow,
+  mapTransactionRow,
+  extractPaymentPayload,
+  validatePaymentPayload,
+} = require('../dto/paymentDto');
+
+const COMPANY_NAME = 'Ceylon Best Tours';
+const validateInstallmentAmount = ({ installment, amountCents, availableCents }) => {
+  const type = String(installment || '').toUpperCase();
+  if (!['FULL', 'PARTIAL', 'DEPOSIT', 'FINAL', 'ADDITIONAL'].includes(type)) return 'Select a valid payment type.';
+  if (amountCents > availableCents) return `Payment amount exceeds the currently payable balance (${fromCents(availableCents).toFixed(2)}).`;
+  if (type === 'FULL' && amountCents !== availableCents) return `Full payment must equal the currently payable balance (${fromCents(availableCents).toFixed(2)}).`;
+  // Legacy installment labels remain readable, but new payments are flexible
+  // contributions against the whole booking balance.
+  return null;
 };
 
-const modifyDays = (dateStr, days) => {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const uploadPaymentFile = (file) => new Promise((resolve, reject) => {
+  if (!file?.buffer) return resolve(null);
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    return reject(new Error('Receipt storage is not configured.'));
+  }
+  const isPdf = file.mimetype === 'application/pdf';
+  const stream = cloudinary.uploader.upload_stream({
+    folder: 'payment_slips',
+    resource_type: isPdf ? 'raw' : 'image',
+    type: 'private',
+    use_filename: true,
+    unique_filename: true,
+    format: isPdf ? 'pdf' : undefined,
+  }, (error, result) => {
+    if (error) return reject(new Error('Receipt upload failed. Please try again.'));
+    resolve(result?.secure_url || null);
+  });
+  stream.on('error', () => reject(new Error('Receipt upload failed. Please try again.')));
+  stream.end(file.buffer);
+});
+
+const createPaymentFileDownloadUrl = (url) => {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com') return null;
+    const match = parsed.pathname.match(/^\/[^/]+\/(image|raw)\/(upload|private|authenticated)\/(?:v\d+\/)?(.+)$/);
+    if (!match) return null;
+    let publicId = decodeURIComponent(match[3]);
+    let format = null;
+    if (match[1] === 'image') {
+      const extMatch = publicId.match(/\.([a-z0-9]+)$/i);
+      if (extMatch) {
+        format = extMatch[1];
+        publicId = publicId.slice(0, -extMatch[0].length);
+      }
+    }
+    const signedUrl = cloudinary.utils.private_download_url(publicId, format, {
+      resource_type: match[1],
+      type: match[2],
+      attachment: true,
+      expires_at: Math.floor(Date.now() / 1000) + 300,
+    });
+    return new URL(signedUrl);
+  } catch { return null; }
 };
 
-const formatLKR = (val) => {
-  return `LKR ${Number(val).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const getPaymentReceiptDownloadUrl = async (req, res) => {
+  const paymentId = Number(req.params.paymentId);
+  if (!Number.isInteger(paymentId) || paymentId < 1) return res.status(400).json({ message: 'Invalid payment id.' });
+  try {
+    const { rows } = await db.query(`
+      SELECT p.slip_url, b.user_id
+      FROM payment p JOIN booking b ON b.booking_id = p.booking_id
+      WHERE p.payment_id = $1
+    `, [paymentId]);
+    if (!rows.length) return res.status(404).json({ message: 'Payment receipt not found.' });
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
+    if (!isAdmin && Number(rows[0].user_id) !== Number(req.user?.id)) return res.status(403).json({ message: 'Access denied.' });
+    const downloadUrl = createPaymentFileDownloadUrl(rows[0].slip_url);
+    if (!downloadUrl) return res.status(404).json({ message: 'Receipt file is unavailable.' });
+    const extension = new URL(rows[0].slip_url).pathname.match(/\.([a-z0-9]+)$/i)?.[1] || 'file';
+    res.setHeader('Cache-Control', 'private, no-store');
+    return res.json({ downloadUrl: downloadUrl.toString(), fileName: `payment-receipt-${paymentId}.${extension}` });
+  } catch (err) {
+    console.error('getPaymentReceiptDownloadUrl error:', err);
+    return res.status(502).json({ message: 'Failed to prepare payment receipt download.' });
+  }
+};
+
+const downloadPaymentInvoice = async (req, res) => {
+  const bookingId = Number(req.params.bookingId);
+  if (!Number.isInteger(bookingId) || bookingId < 1) return res.status(400).json({ message: 'Invalid booking id.' });
+  try {
+    const { rows } = await db.query(`
+      SELECT b.booking_id, b.user_id, b.tour_type, b.quoted_price, b.additional_charges,
+             b.start_date, b.end_date, b.customer_name, b.contact_number,
+             COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'APPROVED'), 0) AS paid_amount,
+             COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'PENDING'), 0) AS pending_amount
+      FROM booking b LEFT JOIN payment p ON p.booking_id = b.booking_id
+      WHERE b.booking_id = $1
+      GROUP BY b.booking_id
+    `, [bookingId]);
+    if (!rows.length) return res.status(404).json({ message: 'Booking not found.' });
+    const booking = rows[0];
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
+    if (!isAdmin && Number(booking.user_id) !== Number(req.user?.id)) return res.status(403).json({ message: 'Access denied.' });
+    const totalCents = toCents(booking.quoted_price) + toCents(booking.additional_charges);
+    const paidCents = toCents(booking.paid_amount);
+    const pendingCents = toCents(booking.pending_amount);
+    const reference = getBookingReference(booking.tour_type, booking.booking_id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="invoice-${reference}.pdf"`);
+    const doc = new PDFDocument({ size: 'A4', margin: 48 });
+    doc.on('error', (err) => { console.error('Invoice PDF stream error:', err); if (!res.headersSent) res.status(500).end(); });
+    doc.pipe(res);
+    doc.rect(0, 0, doc.page.width, 88).fill('#2D3142');
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(23).text(COMPANY_NAME, 48, 27);
+    doc.font('Helvetica').fontSize(12).text('Payment Invoice', 48, 58);
+    doc.moveDown(4).fillColor('#2D3142').fontSize(11);
+    doc.font('Helvetica-Bold').text(`Invoice: ${reference}`);
+    doc.font('Helvetica').text(`Customer: ${booking.customer_name || 'Customer'}`);
+    doc.text(`Contact: ${booking.contact_number || 'N/A'}`);
+    doc.text(`Booking dates: ${formatDate(booking.start_date) || 'N/A'} to ${formatDate(booking.end_date) || 'N/A'}`);
+    doc.text(`Generated: ${new Date().toISOString().slice(0, 10)}`);
+    doc.moveDown(1.4).font('Helvetica-Bold').fontSize(14).text('Account summary');
+    doc.moveDown(0.5).font('Helvetica').fontSize(11);
+    const money = (cents) => `LKR ${fromCents(cents).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    [['Booking total', totalCents], ['Approved payments received', paidCents], ['Pending receipt verification', pendingCents], ['Outstanding after approved payments', Math.max(0, totalCents - paidCents)], ['Currently payable', Math.max(0, totalCents - paidCents - pendingCents)]].forEach(([label, cents]) => {
+      doc.text(label, 48, doc.y, { continued: true, width: 330 });
+      doc.text(money(cents), { align: 'right' });
+    });
+    doc.moveDown(1).fillColor('#4F5D75').fontSize(9).text('Pending receipts are awaiting verification and are not included in approved payments received.');
+    doc.end();
+  } catch (err) {
+    console.error('downloadPaymentInvoice error:', err);
+    if (!res.headersSent) res.status(500).json({ message: 'Failed to generate payment invoice.' });
+  }
 };
 
 const getAllPayments = async (req, res) => {
+  const { page, limit, offset, buildPagination } = parsePagination(req.query, 15, 100);
+  const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
+
   try {
-    const { rows } = await db.query(`
+    let sql = `
       SELECT p.payment_id, p.booking_id, p.installment, p.amount, p.payment_method, p.received_date, p.notes, p.status, p.slip_url,
              b.tour_type, b.quoted_price, b.additional_charges, b.start_date, b.end_date, b.customer_name, b.contact_number AS customer_phone,
              u.name AS recorded_by_name,
              c.email AS customer_email,
-             (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE booking_id = b.booking_id AND status = 'APPROVED') AS total_paid
+             COALESCE(fs.total_paid, 0) AS total_paid,
+             COALESCE(fs.outstanding_balance, 0) AS outstanding_balance,
+             COALESCE(ps.pending_amount, 0) AS pending_amount,
+             COUNT(*) OVER()::integer AS total_count
       FROM payment p
       JOIN booking b ON p.booking_id = b.booking_id
+      LEFT JOIN v_booking_financial_summary fs ON fs.booking_id = b.booking_id
+      LEFT JOIN (
+        SELECT booking_id, SUM(amount) AS pending_amount
+        FROM payment WHERE status = 'PENDING' GROUP BY booking_id
+      ) ps ON ps.booking_id = b.booking_id
       LEFT JOIN "user" u ON p.recorded_by = u.user_id
       JOIN "user" c ON b.user_id = c.user_id
       ORDER BY CASE p.status WHEN 'PENDING' THEN 0 WHEN 'APPROVED' THEN 1 WHEN 'REJECTED' THEN 2 ELSE 3 END, p.payment_id DESC
-    `);
+    `;
+    const params = [];
 
-    const payments = rows.map((r) => ({
-      id: `PAY${String(r.payment_id).padStart(3, '0')}`,
-      rawId: r.payment_id,
-      bookingId: getBookingReference(r.tour_type, r.booking_id),
-      booking_id: r.booking_id,
-      tourType: r.tour_type === 'PACKAGE' ? 'Package Tour' : r.tour_type === 'CUSTOM' ? 'Customized' : 'P2P Tour',
-      customerName: r.customer_name,
-      customerPhone: r.customer_phone,
-      customerEmail: r.customer_email,
-      type: r.installment === 'DEPOSIT' ? 'Deposit' : r.installment === 'FINAL' ? 'Final' : r.installment === 'ADDITIONAL' ? 'Additional Charges' : 'Full Payment',
-      typePercent: r.installment === 'FULL' ? '100%' : r.installment === 'ADDITIONAL' ? 'Extra' : '50%',
-      amount: formatLKR(r.amount),
-      rawAmount: parseFloat(r.amount),
-      method: r.payment_method === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Cash',
-      date: r.received_date ? r.received_date.toISOString().split('T')[0] : 'Pending',
-      time: '12:00 PM',
-      status: r.status.toLowerCase(),
-      notes: r.notes,
-      recordedBy: r.recorded_by_name || 'Customer',
-      baseAmount: formatLKR(r.quoted_price || 0),
-      additionalCharges: formatLKR(r.additional_charges || 0),
-      rawAdditionalCharges: parseFloat(r.additional_charges || 0),
-      totalAmount: formatLKR(parseFloat(r.quoted_price || 0) + parseFloat(r.additional_charges || 0)),
-      tourDates: `${r.start_date.toISOString().split('T')[0]} to ${r.end_date.toISOString().split('T')[0]}`,
-      isBasePricePaid: parseFloat(r.total_paid || 0) >= parseFloat(r.quoted_price || 0),
-      slip: r.slip_url ? {
-        filename: r.slip_url.split('/').pop().slice(-20),
-        size: 'Cloudinary Upload',
-        uploadedAt: r.received_date ? r.received_date.toISOString().split('T')[0] : 'Pending',
-        previewUrl: r.slip_url
-      } : null
-    }));
+    if (isPaginated) {
+      sql += ` LIMIT $1 OFFSET $2`;
+      params.push(limit, offset);
+    }
 
-    res.json({ payments });
+    const { rows } = await db.query(sql, params);
+    const totalCount = rows.length > 0 ? rows[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    const payments = rows.map(mapPaymentRow);
+    payments.pagination = pagination;
+
+    res.json({ payments, pagination });
   } catch (err) {
     console.error('getAllPayments error:', err);
     res.status(500).json({ message: 'Failed to retrieve payments.' });
@@ -80,7 +204,10 @@ const getPaymentsForBooking = async (req, res) => {
 
   try {
     const { rows: bookingRows } = await db.query(`
-      SELECT b.*, vc.category_name, v.name as vehicle_name, v.vehicle_number
+      SELECT b.booking_id, b.user_id, b.booking_status, b.quoted_price, b.additional_charges, b.tour_type,
+             b.start_date, b.end_date, b.start_location, b.end_location,
+             b.category_id, b.vehicle_id, vc.category_name,
+             v.name AS vehicle_name, v.vehicle_number
       FROM booking b
       LEFT JOIN vehicle_category vc ON b.category_id = vc.category_id
       LEFT JOIN vehicle v ON b.vehicle_id = v.vehicle_id
@@ -93,210 +220,64 @@ const getPaymentsForBooking = async (req, res) => {
 
     const booking = bookingRows[0];
 
-    if (!isAdmin && booking.user_id !== userId) {
+    if (!isAdmin && Number(booking.user_id) !== Number(userId)) {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
     const { rows: paymentRows } = await db.query(`
-      SELECT p.*, u.name AS recorded_by_name
+      SELECT p.payment_id, p.booking_id, p.installment, p.amount, p.payment_method,
+             p.received_date, p.status, p.slip_url, p.notes, p.recorded_by,
+             u.name AS recorded_by_name
       FROM payment p
       LEFT JOIN "user" u ON p.recorded_by = u.user_id
       WHERE p.booking_id = $1
       ORDER BY p.received_date ASC, p.payment_id ASC
     `, [bookingId]);
 
-    const basePrice = booking.quoted_price ? parseFloat(booking.quoted_price) : 0;
-    const additionalCharges = booking.additional_charges ? parseFloat(booking.additional_charges) : 0;
-    const price = basePrice + additionalCharges;
-    const tourType = booking.tour_type;
-    const start_date = booking.start_date ? booking.start_date.toISOString().split('T')[0] : null;
-    const end_date = booking.end_date ? booking.end_date.toISOString().split('T')[0] : null;
+    const baseCents = toCents(booking.quoted_price);
+    const additionalCents = toCents(booking.additional_charges);
+    const priceCents = baseCents + additionalCents;
+    const basePrice = fromCents(baseCents);
+    const additionalCharges = fromCents(additionalCents);
+    const price = fromCents(priceCents);
+    const start_date = formatDate(booking.start_date);
+    const end_date = formatDate(booking.end_date);
 
     const approvedPayments = paymentRows.filter(p => p.status === 'APPROVED');
-    const paidAmount = approvedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-    const remainingAmount = Math.max(0, price - paidAmount);
+    const paidCents = approvedPayments.reduce((sum, p) => sum + toCents(p.amount), 0);
+    const pendingCents = paymentRows.filter(p => p.status === 'PENDING').reduce((sum, p) => sum + toCents(p.amount), 0);
+    const remainingCents = Math.max(0, priceCents - paidCents);
+    const paidAmount = fromCents(paidCents);
+    const pendingAmount = fromCents(pendingCents);
+    const remainingAmount = fromCents(remainingCents);
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const installments = price > 0 ? [{
+      id: 1,
+      number: 1,
+      type: 'Booking Balance',
+      typeLabel: 'Flexible payments accepted',
+      amount: formatLKR(remainingAmount),
+      rawAmount: remainingAmount,
+      dueDate: end_date,
+      dueDateNote: 'Remaining booking balance',
+      status: remainingCents === 0 ? 'PAID' : 'PENDING',
+      statusNote: remainingCents === 0 ? 'Fully paid' : pendingCents > 0 ? 'Payment verification in progress' : 'Payment pending',
+    }] : [];
+    const nextPaymentNote = price <= 0
+      ? 'Price is not yet quoted by admin.'
+      : remainingCents === 0
+        ? 'Fully paid. No outstanding balance.'
+        : pendingCents > 0
+          ? `${formatLKR(pendingAmount)} is awaiting admin verification.`
+          : `${formatLKR(remainingAmount)} remains due.`;
 
-    const installments = [];
-    let nextPaymentNote = '';
-
-    if (price > 0) {
-      if (tourType === 'P2P') {
-        const approvedFull = paymentRows.find(p => p.installment === 'FULL' && p.status === 'APPROVED');
-        const pendingFull = paymentRows.find(p => p.installment === 'FULL' && p.status === 'PENDING');
-        const rejectedFull = paymentRows.find(p => p.installment === 'FULL' && p.status === 'REJECTED');
-
-        let status = 'PENDING';
-        let statusNote = 'Payment pending';
-
-        if (approvedFull || paidAmount >= price) {
-          status = 'PAID';
-          statusNote = `Paid on ${approvedFull ? approvedFull.received_date.toISOString().split('T')[0] : todayStr}`;
-        } else if (pendingFull) {
-          status = 'PENDING';
-          statusNote = 'Pending verification';
-        } else if (todayStr > end_date) {
-          status = 'OVERDUE';
-          statusNote = 'Payment overdue';
-        }
-
-        installments.push({
-          id: 1,
-          number: 1,
-          type: 'Full Payment',
-          typeLabel: '100% of total',
-          amount: formatLKR(price),
-          rawAmount: price,
-          dueDate: end_date,
-          dueDateNote: 'After the tour ends',
-          status: status,
-          statusNote: statusNote
-        });
-
-        if (status !== 'PAID' && status !== 'PENDING') {
-          nextPaymentNote = `Full payment of ${formatLKR(price)} is due on ${end_date} (After the tour ends).`;
-        } else if (status === 'PENDING') {
-          nextPaymentNote = 'Verification in progress for your uploaded full payment.';
-        } else {
-          nextPaymentNote = 'Fully paid. No outstanding balance.';
-        }
-      } else {
-        const depositAmt = basePrice * 0.5;
-        const finalAmt = basePrice * 0.5;
-        const depositDueDate = modifyDays(start_date, 2);
-        const finalDueDate = modifyDays(end_date, -1);
-
-        const approvedDeposit = paymentRows.find(p => p.installment === 'DEPOSIT' && p.status === 'APPROVED');
-        const pendingDeposit = paymentRows.find(p => p.installment === 'DEPOSIT' && p.status === 'PENDING');
-
-        let depStatus = 'PENDING';
-        let depStatusNote = 'Payment pending';
-
-        if (approvedDeposit || paidAmount >= depositAmt) {
-          depStatus = 'PAID';
-          depStatusNote = `Paid on ${approvedDeposit ? approvedDeposit.received_date.toISOString().split('T')[0] : todayStr}`;
-        } else if (pendingDeposit) {
-          depStatus = 'PENDING';
-          depStatusNote = 'Pending verification';
-        } else if (todayStr > depositDueDate) {
-          depStatus = 'OVERDUE';
-          depStatusNote = 'Payment overdue';
-        }
-
-        installments.push({
-          id: 1,
-          number: 1,
-          type: 'Deposit',
-          typeLabel: '50% of total',
-          amount: formatLKR(depositAmt),
-          rawAmount: depositAmt,
-          dueDate: depositDueDate,
-          dueDateNote: 'Within 2 days of tour start',
-          status: depStatus,
-          statusNote: depStatusNote
-        });
-
-        const approvedFinal = paymentRows.find(p => p.installment === 'FINAL' && p.status === 'APPROVED');
-        const pendingFinal = paymentRows.find(p => p.installment === 'FINAL' && p.status === 'PENDING');
-
-        let finalStatus = 'PENDING';
-        let finalStatusNote = 'Payment pending';
-
-        if (approvedFinal || paidAmount >= basePrice) {
-          finalStatus = 'PAID';
-          finalStatusNote = `Paid on ${approvedFinal ? approvedFinal.received_date.toISOString().split('T')[0] : todayStr}`;
-        } else if (pendingFinal) {
-          finalStatus = 'PENDING';
-          finalStatusNote = 'Pending verification';
-        } else if (todayStr > finalDueDate) {
-          finalStatus = 'OVERDUE';
-          finalStatusNote = 'Payment overdue';
-        }
-
-        installments.push({
-          id: 2,
-          number: 2,
-          type: 'Final Payment',
-          typeLabel: 'Remaining 50%',
-          amount: formatLKR(finalAmt),
-          rawAmount: finalAmt,
-          dueDate: finalDueDate,
-          dueDateNote: 'Before the last day of tour',
-          status: finalStatus,
-          statusNote: finalStatusNote
-        });
-
-        let additionalStatus = 'PENDING';
-        let additionalStatusNote = 'Payment pending';
-        const additionalDueDate = end_date;
-
-        if (additionalCharges > 0) {
-          const approvedAdditional = paymentRows.find(p => p.installment === 'ADDITIONAL' && p.status === 'APPROVED');
-          const pendingAdditional = paymentRows.find(p => p.installment === 'ADDITIONAL' && p.status === 'PENDING');
-
-          if (approvedAdditional || paidAmount >= price) {
-            additionalStatus = 'PAID';
-            additionalStatusNote = `Paid on ${approvedAdditional ? approvedAdditional.received_date.toISOString().split('T')[0] : todayStr}`;
-          } else if (pendingAdditional) {
-            additionalStatus = 'PENDING';
-            additionalStatusNote = 'Pending verification';
-          } else if (todayStr > additionalDueDate) {
-            additionalStatus = 'OVERDUE';
-            additionalStatusNote = 'Payment overdue';
-          }
-
-          installments.push({
-            id: 3,
-            number: 3,
-            type: 'Additional Charges',
-            typeLabel: 'Extra Mileage',
-            amount: formatLKR(additionalCharges),
-            rawAmount: additionalCharges,
-            dueDate: additionalDueDate,
-            dueDateNote: 'After the tour ends',
-            status: additionalStatus,
-            statusNote: additionalStatusNote
-          });
-        }
-
-        if (depStatus !== 'PAID' && depStatus !== 'PENDING') {
-          nextPaymentNote = `Deposit of ${formatLKR(depositAmt)} is due on ${depositDueDate} (Within 2 days of tour start).`;
-        } else if (depStatus === 'PENDING') {
-          nextPaymentNote = 'Verification in progress for deposit payment proof.';
-        } else if (finalStatus !== 'PAID' && finalStatus !== 'PENDING') {
-          nextPaymentNote = `Final payment of ${formatLKR(finalAmt)} is due on ${finalDueDate} (Before the last day of the tour).`;
-        } else if (finalStatus === 'PENDING') {
-          nextPaymentNote = 'Verification in progress for final payment proof.';
-        } else if (additionalCharges > 0 && additionalStatus !== 'PAID' && additionalStatus !== 'PENDING') {
-          nextPaymentNote = `Additional charges of ${formatLKR(additionalCharges)} are due.`;
-        } else if (additionalCharges > 0 && additionalStatus === 'PENDING') {
-          nextPaymentNote = 'Verification in progress for additional charges proof.';
-        } else {
-          nextPaymentNote = 'Fully paid. No outstanding balance.';
-        }
-      }
-    } else {
-      nextPaymentNote = 'Price is not yet quoted by admin.';
-    }
-
-    const transactions = paymentRows.map(p => ({
-      id: `TX${String(p.payment_id).padStart(3, '0')}`,
-      rawId: p.payment_id,
-      date: p.received_date ? p.received_date.toISOString().split('T')[0] : 'Pending',
-      type: p.installment === 'DEPOSIT' ? 'Deposit' : p.installment === 'FINAL' ? 'Final Payment' : p.installment === 'ADDITIONAL' ? 'Additional Charges' : 'Full Payment',
-      amount: formatLKR(p.amount),
-      method: p.payment_method === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Cash',
-      status: p.status === 'APPROVED' ? 'VERIFIED' : p.status === 'REJECTED' ? 'REJECTED' : 'PENDING VERIFICATION',
-      recordedBy: p.recorded_by_name || 'Customer',
-      notes: p.notes,
-      slipUrl: p.slip_url,
-      tourId: getBookingReference(booking.tour_type, booking.booking_id),
-    }));
+    const bookingRef = getBookingReference(booking.tour_type, booking.booking_id);
+    const transactions = paymentRows.map((p) => mapTransactionRow(p, bookingRef));
 
     res.json({
       bookingId: bookingId,
-      bookingReference: getBookingReference(booking.tour_type, booking.booking_id),
+      bookingReference: bookingRef,
+      bookingStatus: booking.booking_status,
       tourType: booking.tour_type,
       startLocation: booking.start_location,
       endLocation: booking.end_location,
@@ -307,6 +288,8 @@ const getPaymentsForBooking = async (req, res) => {
       totalAmount: price,
       paidAmount: paidAmount,
       remainingAmount: remainingAmount,
+      pendingAmount: pendingAmount,
+      payableAmount: fromCents(Math.max(0, remainingCents - pendingCents)),
       nextPaymentNote: nextPaymentNote,
       installments: installments,
       transactions: transactions
@@ -318,36 +301,52 @@ const getPaymentsForBooking = async (req, res) => {
 };
 
 const recordPayment = async (req, res) => {
-  const { booking_id, installment, amount, payment_method, received_date, notes } = req.body;
+  const payload = { ...extractPaymentPayload(req.body), slipUrl: null };
+  const validation = validatePaymentPayload(payload);
+  if (!validation.valid) {
+    return res.status(400).json({ message: validation.message });
+  }
   const adminId = req.user.id;
-
-  if (!booking_id || !installment || !amount || !received_date) {
-    return res.status(400).json({ message: 'All required payment fields (booking_id, installment, amount, received_date) must be provided.' });
+  const resolvedMethod = (payload.paymentMethod || 'CASH').toUpperCase();
+  if (!['CASH', 'BANK_TRANSFER'].includes(resolvedMethod)) {
+    return res.status(400).json({ message: 'Select Cash or Bank Transfer as the payment method.' });
+  }
+  if (resolvedMethod === 'BANK_TRANSFER' && !req.file) {
+    return res.status(400).json({ message: 'Upload the bank receipt file to record a bank transfer.' });
   }
 
   try {
-    const { rows: bookingRows } = await db.query('SELECT * FROM booking WHERE booking_id = $1', [booking_id]);
-    if (bookingRows.length === 0) {
-      return res.status(404).json({ message: 'Booking not found.' });
-    }
+    if (req.file) payload.slipUrl = await uploadPaymentFile(req.file);
 
-    const booking = bookingRows[0];
-    if (booking.booking_status === 'CLOSED' || booking.booking_status === 'CANCELLED') {
-      return res.status(400).json({
-        message: `Cannot record payment. Booking is already ${booking.booking_status.toLowerCase()}.`
+    // Atomic execution with balance calculation and lock:
+    // validates payment does not exceed currently payable balance
+    const { rows } = await db.query(
+      `SELECT * FROM sp_record_and_reconcile_payment($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        payload.bookingId,
+        payload.installment,
+        payload.amount,
+        resolvedMethod,
+        payload.receivedDate,
+        adminId,
+        'APPROVED',
+        payload.slipUrl,
+        payload.notes,
+      ]
+    );
+
+    const result = rows[0] || {};
+    if (!result.success) {
+      const status = result.message?.includes('not found') ? 404 : 400;
+      return res.status(status).json({
+        message: result.message || 'Payment amount exceeds the currently payable balance.',
+        remainingBalance: Number(result.remaining_balance || 0),
       });
     }
 
-    const resolvedMethod = payment_method || 'CASH';
-
-    const { rows } = await db.query(`
-      INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, recorded_by, status, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, 'APPROVED', $7) RETURNING payment_id
-    `, [booking_id, installment, amount, resolvedMethod, received_date, adminId, notes || null]);
-
     res.status(201).json({
       message: 'Payment recorded successfully.',
-      payment_id: rows[0].payment_id
+      payment_id: result.payment_id,
     });
   } catch (err) {
     console.error('recordPayment error:', err);
@@ -356,36 +355,69 @@ const recordPayment = async (req, res) => {
 };
 
 const uploadPaymentSlip = async (req, res) => {
-  const { booking_id, installment, amount, notes } = req.body;
+  const { booking_id, installment = 'PARTIAL', amount, notes } = req.body;
+  const paymentMethod = String(req.body.payment_method || 'BANK_TRANSFER').trim().toUpperCase();
+  const amountNum = Number(amount);
+  const validPrecision = /^\d+(?:\.\d{1,2})?$/.test(String(amount ?? '').trim());
   const slipFile = req.file;
 
-  if (!booking_id || !installment || !amount) {
-    return res.status(400).json({ message: 'booking_id, installment, and amount are required.' });
+  if (!booking_id || !Number.isFinite(amountNum) || amountNum <= 0 || !validPrecision) {
+    return res.status(400).json({ message: 'booking_id and a positive payment amount are required.' });
   }
-
-  if (!slipFile) {
-    return res.status(400).json({ message: 'Payment slip file is required.' });
+  if (!['CASH', 'BANK_TRANSFER'].includes(paymentMethod)) {
+    return res.status(400).json({ message: 'Select Cash or Bank Transfer as the payment method.' });
+  }
+  if (paymentMethod === 'BANK_TRANSFER' && !slipFile) {
+    return res.status(400).json({ message: 'Payment receipt file is required for bank transfers.' });
   }
 
   try {
-    const { rows: bookingRows } = await db.query('SELECT * FROM booking WHERE booking_id = $1', [booking_id]);
-    if (bookingRows.length === 0) {
+    const { rows: bookingRows } = await db.query(
+      'SELECT booking_id, user_id, booking_status FROM booking WHERE booking_id = $1',
+      [booking_id]
+    );
+    if (!bookingRows.length) {
       return res.status(404).json({ message: 'Booking not found.' });
     }
+    const booking = bookingRows[0];
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
+    if (!isAdmin && Number(booking.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Access denied: you can only submit payments for your own booking.' });
+    }
 
-    const { rows } = await db.query(`
-      INSERT INTO payment (booking_id, installment, amount, payment_method, received_date, status, slip_url, notes)
-      VALUES ($1, $2, $3, 'BANK_TRANSFER', CURRENT_DATE, 'PENDING', $4, $5) RETURNING payment_id
-    `, [booking_id, installment, amount, slipFile.path, notes || 'Uploaded by Customer']);
+    const slipUrl = slipFile ? await uploadPaymentFile(slipFile) : null;
+
+    // sp_record_and_reconcile_payment verifies payment does not exceed the currently payable balance
+    const { rows } = await db.query(
+      `SELECT * FROM sp_record_and_reconcile_payment($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        booking_id,
+        String(installment).toUpperCase(),
+        amountNum,
+        paymentMethod,
+        null,
+        req.user.id,
+        'PENDING',
+        slipUrl,
+        notes || `Customer submitted ${paymentMethod === 'CASH' ? 'cash payment claim' : 'bank transfer receipt'}`,
+      ]
+    );
+
+    const result = rows[0] || {};
+    if (!result.success) {
+      return res.status(400).json({
+        message: result.message || 'Payment amount exceeds the currently payable balance.',
+        remainingBalance: Number(result.remaining_balance || 0),
+      });
+    }
 
     res.status(201).json({
-      message: 'Payment slip uploaded successfully. Under review by admin.',
-      payment_id: rows[0].payment_id,
-      slip_url: slipFile.path
+      message: 'Payment submitted successfully. It is pending admin verification.',
+      payment_id: result.payment_id,
     });
   } catch (err) {
     console.error('uploadPaymentSlip error:', err);
-    res.status(500).json({ message: 'Failed to upload payment slip.' });
+    res.status(500).json({ message: 'Failed to submit payment.' });
   }
 };
 
@@ -435,11 +467,56 @@ const rejectPayment = async (req, res) => {
   }
 };
 
+const updatePaymentSlip = async (req, res) => {
+  const { paymentId } = req.params;
+  let slipUrl = null;
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'Upload the receipt file to replace the payment slip.' });
+  }
+
+  try {
+    const { rows: paymentRows } = await db.query(
+      'SELECT p.payment_id, b.user_id FROM payment p JOIN booking b ON p.booking_id = b.booking_id WHERE p.payment_id = $1',
+      [paymentId]
+    );
+
+    if (paymentRows.length === 0) {
+      return res.status(404).json({ message: 'Payment record not found.' });
+    }
+
+    const payment = paymentRows[0];
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'STAFF'].includes(req.user?.role);
+    if (!isAdmin && Number(payment.user_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Access denied: you can only update payment slips for your own booking.' });
+    }
+
+    slipUrl = await uploadPaymentFile(req.file);
+
+    await db.query(
+      'UPDATE payment SET slip_url = $1 WHERE payment_id = $2',
+      [slipUrl, paymentId]
+    );
+
+    res.json({
+      message: 'Payment slip updated successfully.',
+      paymentId: Number(paymentId),
+      slip_url: slipUrl,
+    });
+  } catch (err) {
+    console.error('updatePaymentSlip error:', err);
+    res.status(500).json({ message: 'Failed to update payment slip.' });
+  }
+};
+
 module.exports = {
   getAllPayments,
   getPaymentsForBooking,
   recordPayment,
   uploadPaymentSlip,
+  updatePaymentSlip,
   approvePayment,
-  rejectPayment
+  rejectPayment,
+  getPaymentReceiptDownloadUrl,
+  downloadPaymentInvoice,
 };

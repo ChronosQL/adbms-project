@@ -13,25 +13,17 @@ if (!process.env.JWT_SECRET) {
   console.warn('Warning: JWT_SECRET is not set. Using development fallback secret.');
 }
 
+const {
+  buildUserPayload,
+  extractLoginPayload,
+  extractRegisterPayload,
+} = require('../dto/authDto');
+
 const signToken = (payload) =>
   jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 
-const buildUserPayload = (u) => ({
-  id:                     u.user_id,
-  email:                  u.email,
-  name:                   u.name,
-  role:                   u.role,
-  contact_number:         u.contact_number         || null,
-  street_address:         u.street_address         || null,
-  country:                u.country                || null,
-  zipcode:                u.zipcode                || null,
-  emergency_name:         u.emergency_name         || null,
-  emergency_phone:        u.emergency_phone        || null,
-  emergency_relationship: u.emergency_relationship || null,
-});
-
 const login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = extractLoginPayload(req.body);
 
   if (!email || !password)
     return res.status(400).json({ message: 'Email and password are required.' });
@@ -62,7 +54,7 @@ const login = async (req, res) => {
 };
 
 const register = async (req, res) => {
-  const { name, email, password, country = 'Sri Lanka' } = req.body;
+  const { name, email, password, country } = extractRegisterPayload(req.body);
 
   if (!name || !email || !password)
     return res.status(400).json({ message: 'Name, email and password are required.' });

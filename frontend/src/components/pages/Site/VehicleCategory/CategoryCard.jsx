@@ -59,8 +59,8 @@ const VehicleCard = ({ vehicle, onViewDetails }) => {
                 {/* Price Tag */}
                 <div className="absolute bottom-3 right-3 bg-white rounded-xl px-4 py-2 shadow-lg">
                     <p className="text-xs text-gray-500">{"Starting at"}</p>
-                    <p className="text-xl font-bold text-blue-600">
-                        USD {vehicle.price_per_day}
+                    <p className="text-lg font-bold text-[#EF8354]">
+                        LKR {Number(vehicle.price_per_day).toLocaleString('en-LK')}
                         <span className="text-xs text-gray-500 font-normal">{"/day"}</span>
                     </p>
                 </div>
@@ -120,7 +120,7 @@ const VehicleCard = ({ vehicle, onViewDetails }) => {
                 {/* Mileage Policy */}
                 <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3 mb-4 text-xs text-slate-600">
                     <p className="font-semibold text-slate-800 mb-0.5">Package & Custom Tours Pricing</p>
-                    <p>Includes <span className="font-bold">{isLargeVanOrVan ? 125 : 150} km</span> per day. Additional mileage is charged at <span className="font-bold">$0.5/km</span>.</p>
+                    <p>Includes <span className="font-bold">{isLargeVanOrVan ? 125 : 150} km</span> per day. Additional mileage is charged at <span className="font-bold">LKR 150/km</span>.</p>
                 </div>
 
                 {/* Action Buttons */}
@@ -130,8 +130,7 @@ const VehicleCard = ({ vehicle, onViewDetails }) => {
                             e.stopPropagation();
                             onViewDetails(vehicle);
                         }}
-                        className="flex-1 font-medium py-2.5 rounded-lg transition-colors text-sm hover:shadow-md"
-                        style={{ backgroundColor: '#ffffff', color: '#374151', border: '1px solid #d1d5db' }}
+                        className="flex-1 font-bold py-2.5 rounded-xl transition-all text-sm shadow-md shadow-[#EF8354]/15 bg-[#EF8354] hover:bg-[#4F5D75] text-white cursor-pointer"
                     >
                         {"View Details"}
                     </button>

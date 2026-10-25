@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router';
+import { Clock } from 'lucide-react';
 import { useBookings } from '../../../../context/BookingsContext.jsx';
 import BookingHeader from "./BookingHeader";
 import PaymentSummary from "./PaymentSummary";
-import PaymentBreakdown from "./PaymentBreakdown";
 import PaymentProof from "./PaymentProof";
 import PaymentReminders from "./PaymentReminders";
 import PaymentInformation from "./PaymentInformation";
@@ -12,11 +12,14 @@ import PaymentHistory from "./PaymentHistory";
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   const navigate = useNavigate();
-  const { bookings, getPaymentsForBooking, uploadPaymentSlip } = useBookings();
+  const { bookings, getPaymentsForBooking, uploadPaymentSlip, downloadPaymentInvoice, downloadPaymentReceipt } = useBookings();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
   const [toast, setToast] = useState(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -35,6 +38,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
     getPaymentsForBooking(bookingId)
       .then(data => {
         setPaymentData(data);
+        setPayAmount(String(data.payableAmount ?? data.remainingAmount ?? ""));
       })
       .catch(err => {
         console.error("Error loading payment details:", err);
@@ -46,7 +50,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <svg className="animate-spin h-8 w-8 text-teal-600" viewBox="0 0 24 24" fill="none">
+        <svg className="animate-spin h-8 w-8 text-[#EF8354]" viewBox="0 0 24 24" fill="none">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
@@ -67,7 +71,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
               navigate('/user/profile', { state: { activeTab: 'bookings' } });
             }
           }}
-          className="text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded-xl transition"
+          className="text-xs font-semibold text-white bg-[#EF8354] hover:bg-[#4F5D75] px-4 py-2 rounded-xl transition cursor-pointer"
         >
           Back to Bookings
         </button>
@@ -80,12 +84,20 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   const remaining = paymentData.remainingAmount !== undefined ? paymentData.remainingAmount : price;
   
   const paymentStatus = remaining <= 0 ? 'FULLY PAID' : (paid > 0 ? 'PARTIALLY PAID' : 'PENDING PAYMENT');
+  const effectiveStatus = booking?.status || paymentData?.bookingStatus || 'PENDING';
+  const tourStarted = ['TOUR_STARTED', 'COMPLETED', 'CLOSED'].includes(effectiveStatus);
+
   const paidPercent = price > 0 ? Math.round((paid / price) * 100) : 0;
   const remainingPercent = price > 0 ? Math.round((remaining / price) * 100) : 100;
 
   // Build reminders dynamically
   const reminders = [];
-  if (remaining > 0) {
+  if (!tourStarted) {
+    reminders.push({
+      type: "info",
+      message: "Payment options will become available once your tour has commenced."
+    });
+  } else if (remaining > 0) {
     reminders.push({
       type: "warning",
       message: paymentData.nextPaymentNote || `Please complete your payment before deadline.`
@@ -98,36 +110,48 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   }
 
   const handleUpload = async ({ file, notes }) => {
-    if (!file) return;
+    if (!paymentMethod) {
+      showToast("Choose cash or bank transfer for this payment.", "error");
+      return;
+    }
+    if (paymentMethod === 'BANK_TRANSFER' && !file) return;
 
-    const currentPendingInstallment = paymentData.installments.find(i => i.status === 'PENDING' || i.status === 'OVERDUE');
-    const installmentType = currentPendingInstallment 
-      ? (currentPendingInstallment.type === 'Deposit' ? 'DEPOSIT' : currentPendingInstallment.type === 'Final Payment' ? 'FINAL' : currentPendingInstallment.type === 'Additional Charges' ? 'ADDITIONAL' : 'FULL')
-      : 'FULL';
-    
-    const installmentAmount = Math.min(
-      currentPendingInstallment ? currentPendingInstallment.rawAmount : remaining,
-      remaining
-    );
+    const amount = Number(payAmount);
+    const payableAmount = Number(paymentData.payableAmount ?? remaining);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast("Please enter a valid positive payment amount.", "error");
+      return;
+    }
+    if (Math.round(amount * 100) > Math.round(payableAmount * 100)) {
+      showToast(`Warning: The entered amount (LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}) exceeds the remaining payable balance of LKR ${payableAmount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}.`, "warning");
+      return;
+    }
 
     const formData = new FormData();
     formData.append('booking_id', bookingId);
-    formData.append('installment', installmentType);
-    formData.append('amount', installmentAmount);
+    formData.append('installment', amount >= payableAmount ? 'FULL' : 'PARTIAL');
+    formData.append('payment_method', paymentMethod);
+    formData.append('amount', amount.toFixed(2));
     formData.append('notes', notes || '');
-    formData.append('slip', file);
+    if (paymentMethod === 'BANK_TRANSFER' && file) formData.append('slip', file);
 
     try {
-      setLoading(true);
+      setSubmitting(true);
       await uploadPaymentSlip(formData);
-      showToast("Payment slip uploaded successfully! Under review.", "success");
-      const updated = await getPaymentsForBooking(bookingId);
-      setPaymentData(updated);
+      showToast("Payment submitted successfully. It is awaiting admin verification.", "success");
+      try {
+        const updated = await getPaymentsForBooking(bookingId);
+        setPaymentData(updated);
+        setPayAmount(String(updated.payableAmount ?? updated.remainingAmount ?? ""));
+      } catch (refreshError) {
+        console.error("Receipt submitted but payment history could not refresh:", refreshError);
+        showToast("Receipt submitted. Payment history could not refresh; reload this page to see its status.", "info");
+      }
     } catch (err) {
       console.error(err);
       showToast(err.message || "Failed to upload payment slip.", "error");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -135,13 +159,13 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
   const pendingTx = paymentData.transactions.find(t => t.status === 'PENDING VERIFICATION');
 
   const uploadedMessageText = pendingTx 
-    ? "Payment slip uploaded!" 
+    ? "Payment submitted for verification"
     : (currentPaidInstallments.length > 0 
       ? `${currentPaidInstallments.map(i => i.type).join(' & ')} Paid`
       : null);
 
   const uploadedSubtextText = pendingTx
-    ? "Your payment proof is under verification by admin."
+    ? `Your ${pendingTx.method.toLowerCase()} payment is awaiting admin verification.`
     : (currentPaidInstallments.length > 0
       ? `LKR ${paid.toLocaleString('en-LK', { minimumFractionDigits: 2 })} successfully received and verified.`
       : null);
@@ -172,27 +196,45 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
               remainingAmount={`LKR ${remaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`}
               paymentStatus={paymentStatus}
               paidSubtext={paid > 0 ? `${paidPercent}% of total` : ''}
-              remainingSubtext={price > 0 ? `${remainingPercent}% remaining` : ''}
+              remainingSubtext={price > 0 ? `${remainingPercent}% due after approved payments` : ''}
               nextPaymentNote={paymentData.nextPaymentNote}
             />
 
-            {/* Breakdown */}
-            <PaymentBreakdown
-              installments={paymentData.installments}
-              onViewDetails={(item) => showToast(`${item.type} (LKR ${item.amount}): Due ${item.dueDate} - ${item.dueDateNote}`, "info")}
-              onPayNow={(item) => showToast(`Please transfer due amount to bank details below. Admin will confirm receipt.`, "info")}
-            />
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div><p className="text-xs text-gray-500">Approved payments</p><p className="font-semibold text-green-700 tabular-nums">LKR {paid.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
+              <div><p className="text-xs text-gray-500">Pending verification</p><p className="font-semibold text-amber-700 tabular-nums">LKR {Number(paymentData.pendingAmount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
+              <div><p className="text-xs text-gray-500">Due after approved payments</p><p className="font-semibold text-[#EF8354] tabular-nums">LKR {remaining.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</p></div>
+            </div>
 
             {/* Two-column section */}
             <div className="grid grid-cols-3 gap-5">
               {/* Left: Proof upload */}
               <div className="col-span-2">
-                {remaining > 0 ? (
+                {!tourStarted ? (
+                  <div className="bg-white rounded-2xl border border-[#EF8354]/20 shadow-sm p-8 text-center flex flex-col items-center justify-center h-full min-h-[300px]">
+                    <div className="w-16 h-16 rounded-full bg-[#EF8354]/10 text-[#EF8354] flex items-center justify-center mb-4">
+                      <Clock size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">Payment Option Unavailable</h3>
+                    <p className="text-sm text-gray-500 max-w-sm mb-4 leading-relaxed">
+                      In accordance with our booking policy, payment options and receipt upload become available once your tour has commenced (Tour Status: TOUR_STARTED).
+                    </p>
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                      Current Booking Status: {effectiveStatus.replace("_", " ")}
+                    </span>
+                  </div>
+                ) : remaining > 0 ? (
                   <PaymentProof
                     uploadedMessage={uploadedMessageText}
                     uploadedSubtext={uploadedSubtextText}
                     uploadLabel="Upload Receipt Copy"
                     uploadSublabel="(Offline verification)"
+                    amount={payAmount}
+                    paymentMethod={paymentMethod}
+                    onPaymentMethodChange={setPaymentMethod}
+                    maxAmount={Number(paymentData.payableAmount ?? remaining)}
+                    onAmountChange={setPayAmount}
+                    submitting={submitting}
                     onUpload={handleUpload}
                   />
                 ) : (
@@ -215,11 +257,14 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
               <div className="col-span-1 flex flex-col gap-4">
                 <PaymentReminders reminders={reminders} />
                 <PaymentInformation
-                  paymentMethod="Bank Transfer"
+                  paymentMethod={paymentMethod === 'CASH' ? 'Cash (admin verification)' : paymentMethod === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Select per payment'}
                   bankName="Commercial Bank"
                   accountNumber="1234 5678 9012"
                   accountName="Ceylon Best Tours (Pvt) Ltd"
-                  onDownloadInvoice={() => showToast("Invoice download function will be available shortly.", "info")}
+                  onDownloadInvoice={async () => {
+                    try { await downloadPaymentInvoice(bookingId); }
+                    catch (err) { showToast(err.message || "Failed to download invoice.", "error"); }
+                  }}
                 />
               </div>
             </div>
@@ -228,7 +273,7 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
             <div className="mt-5">
               <PaymentHistory
                 transactions={paymentData.transactions}
-                onViewSlip={(tx) => showToast(`TX details: Received on ${tx.date} via ${tx.method}. Recorded by ${tx.recordedBy}. Notes: ${tx.notes || 'None'}`, "info")}
+                downloadPaymentReceipt={downloadPaymentReceipt}
               />
             </div>
           </div>
@@ -240,14 +285,18 @@ const PaymentPage = ({ bookingId = null, onRequestOpenTab }) => {
         <div
           className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border transition-all duration-300 transform translate-y-0 scale-100 ${
             toast.type === 'error'
-              ? 'bg-red-50 border-red-100 text-red-800'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : toast.type === 'warning'
+              ? 'bg-amber-50 border-amber-300 text-amber-900'
               : toast.type === 'info'
-              ? 'bg-blue-50 border-blue-100 text-blue-800'
-              : 'bg-emerald-50 border-emerald-100 text-emerald-800'
+              ? 'bg-blue-50 border-blue-200 text-blue-800'
+              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
           }`}
         >
           {toast.type === 'success' ? (
             <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-bold shrink-0">✓</div>
+          ) : toast.type === 'warning' ? (
+            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs font-bold shrink-0">!</div>
           ) : toast.type === 'error' ? (
             <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold shrink-0">!</div>
           ) : (

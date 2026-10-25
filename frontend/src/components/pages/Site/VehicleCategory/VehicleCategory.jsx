@@ -4,6 +4,7 @@ import CategoryTabs from './CategoryTabs';
 import VehicleGrid from './VehicleGrid';
 import VehicleDetailsModal from './VehicleDetailsModal';
 import { categoryService, vehicleService } from '../../../../services/vehicleService';
+import Pagination from '../../../common/Pagination';
 
 const OurFleet = () => {
     // State
@@ -11,6 +12,8 @@ const OurFleet = () => {
     const [vehicles, setVehicles] = useState([]);
     const [selectedVehicle, setSelectedVehicle] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(6);
     // Loading states
     const [categoriesLoading, setCategoriesLoading] = useState(true);
     const [vehiclesLoading, setVehiclesLoading] = useState(true);
@@ -61,6 +64,10 @@ const OurFleet = () => {
         return vehicles.filter((vehicle) => String(vehicle.category_id) === String(selectedCategory.id));
     }, [vehicles, selectedCategory]);
 
+    const totalPages = Math.ceil(filteredVehicles.length / limit) || 1;
+    const currentPage = Math.min(page, totalPages);
+    const paginatedVehicles = filteredVehicles.slice((currentPage - 1) * limit, currentPage * limit);
+
     const selectedCategoryName = selectedCategory?.name || 'All categories';
 
     const handleViewDetails = useCallback((vehicle) => {
@@ -73,6 +80,7 @@ const OurFleet = () => {
 
     const handleCategorySelect = useCallback((category) => {
         setSelectedCategory(category);
+        setPage(1);
     }, []);
 
     return (
@@ -110,11 +118,31 @@ const OurFleet = () => {
                 </div>
 
                 <VehicleGrid
-                    vehicles={filteredVehicles}
+                    vehicles={paginatedVehicles}
                     loading={vehiclesLoading || categoriesLoading}
                     onViewDetails={handleViewDetails}
                     categoryName={selectedCategoryName}
                 />
+
+                {filteredVehicles.length > limit && (
+                    <div className="mt-8">
+                        <Pagination
+                            pagination={{
+                                page: currentPage,
+                                totalPages,
+                                total: filteredVehicles.length,
+                                limit,
+                            }}
+                            onPageChange={setPage}
+                            onLimitChange={(newLimit) => {
+                                setLimit(newLimit);
+                                setPage(1);
+                            }}
+                            limitOptions={[6, 12, 24]}
+                            itemLabel="vehicles"
+                        />
+                    </div>
+                )}
 
                 <VehicleDetailsModal
                     isOpen={Boolean(selectedVehicle)}

@@ -83,13 +83,6 @@ const P2PSidePanel = () => {
         +94 77 861 9582
       </a>
     </div>
-
-    {/* ── Payment Note ── */}
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-center">
-      <p className="text-sm font-bold text-slate-700 mb-1">💳 {"Payment Policy"}</p>
-      <p className="text-xs text-slate-500 leading-relaxed" dangerouslySetInnerHTML={{ __html: "Point-to-Point transfers require a single full payment after the tour ends. No upfront payment required." + "<br /><br />" + "Please consider that we only accept cash payments <br>in <b>LKR</b>, <b>USD</b>, or <b>EUR</b>.".replace("single full payment", "<strong>single full payment</strong>").replace("එක් සම්පූර්ණ ගෙවීමක්", "<strong>එක් සම්පූර්ණ ගෙවීමක්</strong>") }}>
-      </p>
-    </div>
   </motion.div>
   );
 };

@@ -21,7 +21,7 @@ const ReviewRow = ({ icon: Icon, label, value }) =>
       </div>
       <div>
         <p className="text-xs text-[#6B7280] font-medium">{label}</p>
-        <p className="text-sm font-semibold text-[#2D3142] mt-0.5">{value}</p>
+        <div className="text-sm font-semibold text-[#2D3142] mt-0.5">{value}</div>
       </div>
     </div>
   ) : null;
@@ -44,6 +44,10 @@ const P2PReviewStep = ({ data }) => {
   (data.luggageCustomItems || []).forEach((item, i) =>
     luggageParts.push(`Custom ${i + 1}: ${item.weight ? `${item.weight} kg` : "weight not set"}`)
   );
+  if ((data.luggageCustomWeight || data.hasCustomWeight) && !(data.luggageCustomItems && data.luggageCustomItems.length > 0)) {
+    const desc = data.luggageCustomDesc ? ` (${data.luggageCustomDesc})` : "";
+    luggageParts.push(`Custom: ${data.luggageCustomWeight ? `${data.luggageCustomWeight} kg` : "Custom luggage"}${desc}`);
+  }
   const luggageSummary    = luggageParts.length > 0 ? luggageParts.join(" · ") : "No luggage";
   const customerFullName  = data.customerName?.trim() || user?.name || "—";
   const hasEmergency      = data.emergencyName || data.emergencyPhone;
@@ -60,8 +64,38 @@ const P2PReviewStep = ({ data }) => {
 
       {/* ── Trip Details ── */}
       <Section title="Trip Details">
-        <ReviewRow icon={MapPin}   label="Pickup Location"   value={data.startLocation} />
-        <ReviewRow icon={MapPin}   label="Drop-off Location" value={data.endLocation} />
+        <ReviewRow
+          icon={MapPin}
+          label="Pickup Location"
+          value={
+            data.startLocation ? (
+              <span className="flex items-center gap-2 flex-wrap">
+                <span>{data.startLocation}</span>
+                {data.pickupLat != null && data.pickupLng != null && (
+                  <span className="text-[10px] font-medium bg-[#EF8354]/10 text-[#EF8354] px-2 py-0.5 rounded-full border border-[#EF8354]/20">
+                    GPS: {Number(data.pickupLat).toFixed(4)}°, {Number(data.pickupLng).toFixed(4)}°
+                  </span>
+                )}
+              </span>
+            ) : null
+          }
+        />
+        <ReviewRow
+          icon={MapPin}
+          label="Drop-off Location"
+          value={
+            data.endLocation ? (
+              <span className="flex items-center gap-2 flex-wrap">
+                <span>{data.endLocation}</span>
+                {data.dropoffLat != null && data.dropoffLng != null && (
+                  <span className="text-[10px] font-medium bg-[#EF8354]/10 text-[#EF8354] px-2 py-0.5 rounded-full border border-[#EF8354]/20">
+                    GPS: {Number(data.dropoffLat).toFixed(4)}°, {Number(data.dropoffLng).toFixed(4)}°
+                  </span>
+                )}
+              </span>
+            ) : null
+          }
+        />
         <ReviewRow icon={Calendar} label="Travel Date"       value={`${data.startDate} → ${data.endDate}`} />
         <ReviewRow icon={Clock}    label="Pickup Time"       value={data.pickupTime} />
         <ReviewRow icon={Calendar} label="Total Days"        value={`${data.totalDays} day(s)`} />
@@ -106,7 +140,7 @@ const P2PReviewStep = ({ data }) => {
       </div>
 
       {/* What happens next */}
-      <div className="bg-[#BFC0C0] rounded-2xl p-5 border border-[#EF8354]/10">
+      <div className="bg-[#EF8354]/10 border border-[#EF8354]/20 rounded-2xl p-6 shadow-xs">
         <p className="text-sm font-bold text-[#2D3142] mb-3">{"What happens after you submit?"}</p>
         {[
           "Your booking is submitted with status: PENDING",
@@ -115,11 +149,11 @@ const P2PReviewStep = ({ data }) => {
           "You accept or reject the quote from your profile",
           "Once accepted, we confirm and assign your vehicle",
         ].map((step, i) => (
-          <div key={i} className="flex items-start gap-2 mb-2">
-            <div className="w-5 h-5 rounded-full bg-[#EF8354] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
+          <div key={i} className="flex items-start gap-3 mb-2.5 last:mb-0">
+            <div className="w-5 h-5 rounded-full bg-[#EF8354] text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold shadow-xs">
               {i + 1}
             </div>
-            <p className="text-sm text-white/80">{step}</p>
+            <p className="text-sm text-[#2D3142] font-medium">{step}</p>
           </div>
         ))}
       </div>

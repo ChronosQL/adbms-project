@@ -2,11 +2,12 @@ import { useState, useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 // import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Send, Lock, MapPin, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Lock, MapPin, CheckCircle, AlertTriangle } from "lucide-react";
 import { AuthContext } from "../../../../../context/AuthContext";
 import { submitP2PBooking, updateBooking } from "../../../../../services/bookingService";
 import BookingStepIndicator from "../Booking/BookingStepIndicator";
-import P2PTripStep from "./P2PTripStep";
+import { isValidPrimaryPhone } from "../../../../../utils/bookingValidation";
+import P2PTripStep, { isSameP2PLocation } from "./P2PTripStep";
 import BookingPassengersStep from "../Booking/BookingPassengersStep";
 import BookingNotesStep from "../Booking/BookingNotesStep";
 import P2PReviewStep from "./P2PReviewStep";
@@ -18,6 +19,10 @@ const initialData = {
   tourType: "P2P",
   startLocation: "",
   endLocation: "",
+  pickupLat: null,
+  pickupLng: null,
+  dropoffLat: null,
+  dropoffLng: null,
   startDate: "",
   endDate: "",
   pickupTime: "",
@@ -48,7 +53,7 @@ const initialData = {
 const GuestGuard = ({ navigate }) => {
   
   return (
-  <div className="min-h-screen bg-[#BFC0C0] flex items-center justify-center px-4">
+  <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -70,7 +75,7 @@ const GuestGuard = ({ navigate }) => {
         </button>
         <button
           onClick={() => navigate("/register")}
-          className="border border-[#EF8354]/15 text-[#2D3142] px-6 py-3 rounded-xl font-semibold hover:bg-[#BFC0C0] transition-colors cursor-pointer"
+          className="border border-[#EF8354]/15 text-[#2D3142] px-6 py-3 rounded-xl font-semibold hover:bg-slate-100 transition-colors cursor-pointer"
         >
           {"Register"}
         </button>
@@ -98,21 +103,21 @@ const SuccessScreen = ({ bookingId, navigate }) => {
     </h2>
     <p className="text-[#6B7280] text-sm mb-2">{"Your booking reference is:"}</p>
     <p className="text-lg font-bold text-[#EF8354] mb-8">{bookingId}</p>
-    <div className="bg-[#BFC0C0] rounded-2xl p-5 mb-6 text-left space-y-2">
+    <div className="bg-[#EF8354]/10 border border-[#EF8354]/20 rounded-2xl p-5 mb-6 text-left space-y-2.5">
       {[
         "Your booking is now PENDING",
         "Our team will review and send a price quote within 24 hours",
-        "You can track your booking status from your profile",
+        "You can track your booking status from your bookings page",
       ].map((s, i) => (
-        <div key={i} className="flex items-start gap-2 text-sm text-[#2D3142]/70">
+        <div key={i} className="flex items-start gap-2.5 text-sm text-[#2D3142]">
           <span className="text-[#EF8354] font-bold flex-shrink-0">✓</span>
           {s}
         </div>
       ))}
     </div>
     <button
-      onClick={() => navigate("/user/profile")}
-      className="w-full bg-[#EF8354] hover:bg-[#4F5D75] text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 tracking-wide cursor-pointer"
+      onClick={() => navigate("/user/profile", { state: { activeTab: "bookings" } })}
+      className="w-full bg-[#EF8354] hover:bg-[#4F5D75] text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 tracking-wide cursor-pointer shadow-md shadow-[#EF8354]/20"
     >
       {"View My Bookings"}
     </button>
@@ -134,9 +139,22 @@ const areChildAgesValid = (noOfChildren, agesOfChildren) => {
 // ─── Validation ───────────────────────────────────────────────────────────────
 const validateStep = (step, data) => {
   switch (step) {
-    case 0: return data.startLocation.trim() && data.endLocation.trim() && data.startDate && data.endDate && data.pickupTime;
+    case 0:
+      return (
+        Boolean(data.startLocation?.trim()) &&
+        Boolean(data.endLocation?.trim()) &&
+        !isSameP2PLocation(
+          data.startLocation,
+          data.endLocation,
+          { lat: data.pickupLat, lng: data.pickupLng },
+          { lat: data.dropoffLat, lng: data.dropoffLng }
+        ) &&
+        Boolean(data.startDate) &&
+        Boolean(data.endDate) &&
+        Boolean(data.pickupTime)
+      );
     case 1: return data.noOfAdults >= 1 && data.categoryId && areChildAgesValid(data.noOfChildren, data.agesOfChildren);
-    case 2: return data.customerName.trim() && (data.contactNumber || '').trim();
+    case 2: return data.customerName.trim() && isValidPrimaryPhone(data.contactPlatform, data.contactNumber);
     case 3: return true;
     default: return false;
   }
@@ -149,6 +167,21 @@ const PointToPoint = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const editBooking = location.state?.editBooking || null;
+
+  const resolveCategorySlug = (catId, catName) => {
+    if (!catId && !catName) return "";
+    const map = {
+      "mini car": "mini_car", "normal car": "normal_car", "sedan car": "sedan_car",
+      "mpv": "mpv", "suv": "suv", "mini van": "mini_van", "van": "van", "large van": "large_van",
+      "1": "mini_car", "2": "normal_car", "3": "sedan_car", "4": "mpv",
+      "5": "suv", "6": "mini_van", "7": "van", "8": "large_van",
+    };
+    const byName = catName ? map[String(catName).trim().toLowerCase()] : null;
+    if (byName) return byName;
+    const byId = catId ? map[String(catId).trim()] : null;
+    if (byId) return byId;
+    return String(catId || "");
+  };
 
   const [currentStep, setCurrentStep] = useState(0);
   const [maxReachedStep, setMaxReachedStep] = useState(0);
@@ -167,6 +200,12 @@ const PointToPoint = () => {
       ...initialData,
       ...editBooking,
       customerName: editBooking.customerName || user?.name || "",
+      startLocation: editBooking.startLocation || "",
+      endLocation: editBooking.endLocation || "",
+      pickupLat: editBooking.pickupLat ?? null,
+      pickupLng: editBooking.pickupLng ?? null,
+      dropoffLat: editBooking.dropoffLat ?? null,
+      dropoffLng: editBooking.dropoffLng ?? null,
       contactPlatform: editBooking.contactPlatform || "mobile",
       contactNumber: editBooking.contactNumber || editBooking.customerPhone || user?.contact_number || "",
       contactPlatform2: editBooking.contactPlatform2 || "",
@@ -177,7 +216,7 @@ const PointToPoint = () => {
       noOfChildren: editBooking.noOfChildren || 0,
       agesOfChildren: editBooking.agesOfChildren || "",
       babySeatNeeded: editBooking.babySeatNeeded || false,
-      categoryId: editBooking.categoryId || "",
+      categoryId: resolveCategorySlug(editBooking.categoryId, editBooking.categoryName),
       luggage10kg: editBooking.luggage10kg || 0,
       luggage25kg: editBooking.luggage25kg || 0,
       luggage35kg: editBooking.luggage35kg || 0,
@@ -193,12 +232,29 @@ const PointToPoint = () => {
   const [bookingId, setBookingId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [stepWarning, setStepWarning] = useState("");
 
   if (!user) return <GuestGuard navigate={navigate} />;
 
-  const handleChange = (field, value) => setData((prev) => ({ ...prev, [field]: value }));
+  const isSameLocation = isSameP2PLocation(
+    data.startLocation,
+    data.endLocation,
+    { lat: data.pickupLat, lng: data.pickupLng },
+    { lat: data.dropoffLat, lng: data.dropoffLng }
+  );
+
+  const handleChange = (field, value) => {
+    setStepWarning("");
+    setData((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleNext = () => {
+    if (currentStep === 0 && isSameLocation) {
+      setStepWarning("Starting place and ending destination cannot be the same. Please choose a different drop-off destination.");
+      return;
+    }
     if (validateStep(currentStep, data)) {
+      setStepWarning("");
       setCurrentStep((s) => {
         const next = s + 1;
         setMaxReachedStep((m) => Math.max(m, next));
@@ -206,7 +262,10 @@ const PointToPoint = () => {
       });
     }
   };
-  const handleBack = () => setCurrentStep((s) => s - 1);
+  const handleBack = () => {
+    setStepWarning("");
+    setCurrentStep((s) => s - 1);
+  };
 
   const CATEGORY_LABELS = {
     mini_car: "Mini Car", normal_car: "Normal Car", sedan_car: "Sedan Car",
@@ -221,6 +280,10 @@ const PointToPoint = () => {
         tourType: "P2P",
         startLocation: data.startLocation,
         endLocation: data.endLocation,
+        pickupLat: data.pickupLat,
+        pickupLng: data.pickupLng,
+        dropoffLat: data.dropoffLat,
+        dropoffLng: data.dropoffLng,
         startDate: data.startDate,
         endDate: data.endDate,
         pickupTime: data.pickupTime,
@@ -234,7 +297,8 @@ const PointToPoint = () => {
         luggage10kg: data.luggage10kg || 0,
         luggage25kg: data.luggage25kg || 0,
         luggage35kg: data.luggage35kg || 0,
-        luggageCustomCount: data.luggageCustomCount || 0,
+        luggageCustomCount: (data.hasCustomWeight || (data.luggageCustomCount || 0) > 0 || data.luggageCustomWeight) ? 1 : 0,
+        luggageCustomDesc: data.luggageCustomDesc || (data.luggageCustomWeight ? `${data.luggageCustomWeight}kg luggage` : null),
         luggageCustomItems: data.luggageCustomItems || [],
         customerName: data.customerName,
         contactPlatform: data.contactPlatform || "whatsapp",
@@ -259,10 +323,10 @@ const PointToPoint = () => {
     }
   };
  
-  const canProceed = validateStep(currentStep, data);
+  const canProceed = (currentStep === 0 && isSameLocation) ? true : validateStep(currentStep, data);
  
   return (
-    <div className="min-h-screen bg-[#BFC0C0] pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16">
  
       {/* ── Page Title ── */}
       <div className="text-center py-12 px-4">
@@ -311,7 +375,14 @@ const PointToPoint = () => {
 ]}
                     currentStep={currentStep}
                     maxReachedStep={maxReachedStep}
-                    onStepClick={(idx) => setCurrentStep(idx)}
+                    onStepClick={(idx) => {
+                      if (idx > currentStep && currentStep === 0 && isSameLocation) {
+                        setStepWarning("Starting place and ending destination cannot be the same. Please choose a different drop-off destination.");
+                        return;
+                      }
+                      setStepWarning("");
+                      setCurrentStep(idx);
+                    }}
                   />
  
                   <AnimatePresence mode="wait">
@@ -329,12 +400,23 @@ const PointToPoint = () => {
                     </motion.div>
                   </AnimatePresence>
  
+                  {/* Step Warning */}
+                  {stepWarning && (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 mt-6 text-xs font-semibold text-amber-900 shadow-xs">
+                      <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-bold text-amber-800">Route Selection Warning</p>
+                        <p className="mt-0.5 text-amber-700">{stepWarning}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Navigation */}
                   <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#EF8354]/10">
                     <button
                       onClick={handleBack}
                       disabled={currentStep === 0}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#EF8354]/15 text-[#2D3142]/70 font-semibold hover:bg-[#BFC0C0] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#EF8354]/15 text-[#2D3142]/70 font-semibold hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                     >
                       <ChevronLeft className="w-4 h-4" /> {"Back"}
                     </button>
@@ -355,7 +437,7 @@ const PointToPoint = () => {
                         <button
                           onClick={handleSubmit}
                           disabled={submitting}
-                          className="w-full bg-[#EF8354] hover:bg-[#4F5D75] disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 tracking-wide cursor-pointer"
+                          className="flex items-center gap-2 px-7 py-3 rounded-xl bg-[#EF8354] hover:bg-[#4F5D75] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold transition-colors cursor-pointer shadow-md shadow-[#EF8354]/20"
                         >
                           {submitting ? (
                             <><span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block" /> {"Submitting..."}</>

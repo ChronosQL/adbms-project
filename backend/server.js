@@ -11,6 +11,8 @@ const cityRoutes = require('./routes/cityRoutes');
 const packageRoutes = require('./routes/packageRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const reportRoutes  = require('./routes/reportRoutes');
+const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const { startCronScheduler, stopCronScheduler } = require('./cron/scheduler');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -56,6 +58,7 @@ app.use('/api/cities', cityRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled server error:', err);
@@ -66,4 +69,16 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ message: 'Internal server error.' });
 });
 
-app.listen(PORT, () => console.log(`Backend running on ${FRONTEND_ORIGIN}:${PORT}`));
+const server = app.listen(PORT, () => {
+  console.log(`Backend running on ${FRONTEND_ORIGIN}:${PORT}`);
+  startCronScheduler();
+});
+
+const handleShutdown = () => {
+  console.log('Shutting down server gracefully...');
+  stopCronScheduler();
+  server.close(() => process.exit(0));
+};
+
+process.on('SIGTERM', handleShutdown);
+process.on('SIGINT', handleShutdown);

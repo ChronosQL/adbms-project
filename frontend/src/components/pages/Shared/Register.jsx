@@ -244,7 +244,7 @@ function Register() {
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
               type="submit"
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-base font-medium text-white bg-slate-900 dark:bg-[#EF8354] hover:bg-slate-800 dark:hover:bg-[#4F5D75] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF8354] transition-all cursor-pointer mt-4"
+              className="w-full flex justify-center items-center py-3.5 px-4 rounded-xl shadow-md shadow-[#EF8354]/20 text-base font-bold text-white bg-[#EF8354] hover:bg-[#4F5D75] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF8354] transition-all cursor-pointer mt-4"
             >
               {loading ? "Creating account..." : "Create Account"}
               <ArrowRight className="ml-2 h-5 w-5" />

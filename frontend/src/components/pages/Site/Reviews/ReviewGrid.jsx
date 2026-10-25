@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReviewCard from './ReviewCard';
-const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
-  
+import Pagination from '../../../common/Pagination';
+
+const ReviewGrid = ({ reviews, filters = {}, setFilters, pagination = null }) => {
+  const gridTopRef = useRef(null);
 
   const SORT_OPTIONS = [
     { value: 'newest',    label: "Newest First" },
@@ -26,6 +28,8 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
   const sort = filters.sort || 'newest';
   const starFilter = filters.stars || "All";
   const bookingTypeFilter = filters.tourTypeLabel || "All";
+  const activePagination = pagination || reviews.pagination;
+  const totalCount = activePagination ? activePagination.total : reviews.length;
 
   return (
     <>
@@ -46,14 +50,14 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
         .rvg-toolbar-label {
           font-size: 10px; font-weight: 700;
           letter-spacing: 0.2em; text-transform: uppercase;
-          color: #5a8080; flex-shrink: 0;
+          color: #4F5D75; flex-shrink: 0;
         }
         .rvg-star-btn {
           display: inline-flex; align-items: center; gap: 4px;
           padding: 6px 14px; border-radius: 100px;
           font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
-          border: 1.5px solid rgba(0,176,165,0.22);
-          background: transparent; color: #3a5a5a;
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
+          background: transparent; color: #2D3142;
           cursor: pointer;
           transition: all 0.2s ease;
         }
@@ -61,7 +65,7 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
         .rvg-star-btn.active {
           background: #EF8354; color: #fff;
           border-color: #EF8354;
-          box-shadow: 0 4px 14px rgba(0,176,165,0.35);
+          box-shadow: 0 4px 14px rgba(239, 131, 84, 0.35);
         }
 
         /* Sort select */
@@ -69,8 +73,8 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
           margin-left: auto;
           padding: 8px 14px; border-radius: 10px;
           font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
-          border: 1.5px solid rgba(0,176,165,0.22);
-          background: #fff; color: #3a5a5a;
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
+          background: #fff; color: #2D3142;
           cursor: pointer; outline: none;
           transition: border-color 0.2s ease;
         }
@@ -114,7 +118,7 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
         .rvg-count span { font-size: 18px; font-weight: 800; color: #0d2b2b; letter-spacing: -0.02em; }
       `}</style>
 
-      <div className="rvg-wrap">
+      <div className="rvg-wrap" ref={gridTopRef}>
         {/* Toolbar */}
         <div className="rvg-toolbar">
           <span className="rvg-toolbar-label">{"Stars"}</span>
@@ -122,7 +126,7 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
             <button
               key={s}
               className={`rvg-star-btn ${starFilter === s ? 'active' : ''}`}
-              onClick={() => setFilters({ ...filters, stars: s })}
+              onClick={() => setFilters({ ...filters, stars: s, page: 1 })}
             >
               {s === "All" ? "All" : `${'★'.repeat(Number(s))} ${s}`}
             </button>
@@ -141,17 +145,17 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
                   ["Point to Point Tours"]: 'P2P',
                   ["All"]: ''
                 };
-                setFilters({ ...filters, tourType: map[type], tourTypeLabel: type });
+                setFilters({ ...filters, tourType: map[type], tourTypeLabel: type, page: 1 });
               }}
             >
               {type}
             </button>
           ))}
-          <span className="rvg-count"><span>{reviews.length}</span> {"reviews"}</span>
+          <span className="rvg-count"><span>{totalCount}</span> {"reviews"}</span>
           <select
             className="rvg-sort"
             value={sort}
-            onChange={e => setFilters({ ...filters, sort: e.target.value })}
+            onChange={e => setFilters({ ...filters, sort: e.target.value, page: 1 })}
           >
             {SORT_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -185,9 +189,20 @@ const ReviewGrid = ({ reviews, filters = {}, setFilters }) => {
             </AnimatePresence>
           </div>
         )}
+
+        {/* Pagination Controls */}
+        <Pagination
+          pagination={activePagination}
+          onPageChange={(p) => setFilters({ ...filters, page: p })}
+          onLimitChange={(l) => setFilters({ ...filters, limit: l, page: 1 })}
+          limitOptions={[12, 24, 48]}
+          itemLabel="reviews"
+          scrollToRef={gridTopRef}
+        />
       </div>
     </>
   );
 };
 
 export default ReviewGrid;
+

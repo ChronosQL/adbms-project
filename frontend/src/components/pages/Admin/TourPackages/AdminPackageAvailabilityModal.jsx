@@ -90,7 +90,7 @@ const AdminPackageAvailabilityModal = ({ pkg, onClose, dark = false }) => {
                 position: fixed;
                 inset: 0;
                 z-index: 260;
-                background: rgba(0, 20, 18, 0.72);
+                background: rgba(45, 49, 66, 0.72);
                 backdrop-filter: blur(8px);
                 display: flex;
                 align-items: center;
@@ -98,45 +98,61 @@ const AdminPackageAvailabilityModal = ({ pkg, onClose, dark = false }) => {
                 padding: 20px;
               }
               .apa-modal {
-                width: min(420px, 100%);
+                width: min(440px, 100%);
                 border-radius: 22px;
-                background: linear-gradient(180deg, #ffffff, #f7fffe);
-                border: 1px solid rgba(0, 176, 165, 0.16);
-                box-shadow: 0 26px 64px rgba(0, 60, 50, 0.26);
+                background: #ffffff;
+                border: 1px solid #E8E8EA;
+                box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
                 overflow: hidden;
               }
               .apa-modal.dark {
-                background: linear-gradient(180deg, #0f172a, #0b1220);
-                border-color: rgba(255, 255, 255, 0.08);
+                background: #383C4E;
+                border-color: rgba(255, 255, 255, 0.1);
+                box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
               }
               .apa-header {
                 position: relative;
-                padding: 18px 18px 14px;
-                background: linear-gradient(135deg, rgba(0, 176, 165, 0.12), rgba(0, 176, 165, 0.03));
-                border-bottom: 1px solid rgba(0, 176, 165, 0.12);
+                padding: 20px 22px 16px;
+                background: #F7F7F8;
+                border-bottom: 1px solid #EEEEF0;
               }
               .apa-modal.dark .apa-header {
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+                background: rgba(255, 255, 255, 0.03);
                 border-bottom-color: rgba(255, 255, 255, 0.08);
               }
               .apa-close {
                 position: absolute;
-                top: 14px;
-                right: 14px;
+                top: 16px;
+                right: 16px;
                 width: 34px;
                 height: 34px;
+                padding: 0;
+                margin: 0;
                 border-radius: 50%;
-                border: 1px solid rgba(0, 176, 165, 0.18);
-                background: rgba(255, 255, 255, 0.75);
-                display: grid;
-                place-items: center;
-                color: #0d2b2b;
+                border: 1px solid #E8E8EA;
+                background: #ffffff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #4F5D75;
                 cursor: pointer;
+                transition: all 0.15s ease;
+                box-sizing: border-box;
+                z-index: 10;
+              }
+              .apa-close:hover {
+                color: #EF8354;
+                border-color: #EF8354;
+                background: rgba(239, 131, 84, 0.08);
               }
               .apa-modal.dark .apa-close {
-                background: rgba(15, 23, 42, 0.8);
-                color: #e2e8f0;
-                border-color: rgba(255, 255, 255, 0.14);
+                background: #2D3142;
+                color: #B7BAC7;
+                border-color: rgba(255, 255, 255, 0.12);
+              }
+              .apa-modal.dark .apa-close:hover {
+                color: #EF8354;
+                border-color: #EF8354;
               }
               .apa-kicker {
                 display: inline-flex;
@@ -144,39 +160,38 @@ const AdminPackageAvailabilityModal = ({ pkg, onClose, dark = false }) => {
                 gap: 8px;
                 font-size: 11px;
                 font-weight: 800;
-                letter-spacing: 0.22em;
+                letter-spacing: 0.12em;
                 text-transform: uppercase;
-                color: #5a8080;
+                color: #EF8354;
               }
-              .apa-modal.dark .apa-kicker { color: #94a3b8; }
               .apa-title {
-                margin-top: 8px;
-                font-size: 1.2rem;
-                font-weight: 900;
-                letter-spacing: -0.03em;
-                color: #0d2b2b;
+                margin-top: 6px;
+                font-size: 1.25rem;
+                font-weight: 800;
+                letter-spacing: -0.02em;
+                color: #2D3142;
               }
-              .apa-modal.dark .apa-title { color: #e2e8f0; }
+              .apa-modal.dark .apa-title { color: #F5F5F6; }
               .apa-sub {
-                margin-top: 5px;
+                margin-top: 4px;
                 font-size: 13px;
-                color: #5a8080;
-                line-height: 1.6;
+                color: #4F5D75;
+                line-height: 1.5;
               }
-              .apa-modal.dark .apa-sub { color: #94a3b8; }
+              .apa-modal.dark .apa-sub { color: #B7BAC7; }
               .apa-body {
-                padding: 16px 18px 18px;
+                padding: 20px 22px;
                 display: grid;
-                gap: 14px;
+                gap: 16px;
               }
               .apa-panel {
                 padding: 14px;
                 border-radius: 16px;
-                background: rgba(255, 255, 255, 0.78);
-                border: 1px solid rgba(0, 176, 165, 0.12);
+                background: #FAFAFB;
+                border: 1px solid #EEEEF0;
               }
               .apa-modal.dark .apa-panel {
-                background: rgba(2, 6, 23, 0.55);
+                background: rgba(255, 255, 255, 0.03);
                 border-color: rgba(255, 255, 255, 0.08);
               }
               .apa-row {
@@ -188,10 +203,10 @@ const AdminPackageAvailabilityModal = ({ pkg, onClose, dark = false }) => {
               .apa-label {
                 font-size: 12px;
                 font-weight: 800;
-                color: #0d2b2b;
+                color: #2D3142;
                 margin-bottom: 6px;
               }
-              .apa-modal.dark .apa-label { color: #e2e8f0; }
+              .apa-modal.dark .apa-label { color: #F5F5F6; }
               .apa-options {
                 display: grid;
                 gap: 10px;
@@ -201,41 +216,43 @@ const AdminPackageAvailabilityModal = ({ pkg, onClose, dark = false }) => {
                 align-items: center;
                 justify-content: space-between;
                 gap: 12px;
-                padding: 12px 14px;
+                padding: 14px 16px;
                 border-radius: 14px;
-                border: 1px solid rgba(0, 176, 165, 0.14);
-                background: rgba(255, 255, 255, 0.76);
+                border: 1.5px solid #E8E8EA;
+                background: #ffffff;
                 cursor: pointer;
                 transition: all 0.18s ease;
               }
               .apa-modal.dark .apa-option {
-                background: rgba(15, 23, 42, 0.65);
-                border-color: rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.03);
+                border-color: rgba(255, 255, 255, 0.1);
               }
               .apa-option.active.available {
-                border-color: rgba(34, 197, 94, 0.35);
-                box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.08);
+                border-color: #2F9E44;
+                background: rgba(47, 158, 68, 0.06);
+                box-shadow: inset 0 0 0 1px #2F9E44;
               }
               .apa-option.active.unavailable {
-                border-color: rgba(204, 51, 68, 0.35);
-                box-shadow: inset 0 0 0 1px rgba(204, 51, 68, 0.08);
+                border-color: #E0483B;
+                background: rgba(224, 72, 59, 0.06);
+                box-shadow: inset 0 0 0 1px #E0483B;
               }
               .apa-option-title {
-                font-size: 13px;
-                font-weight: 900;
-                color: #0d2b2b;
+                font-size: 13.5px;
+                font-weight: 800;
+                color: #2D3142;
               }
-              .apa-modal.dark .apa-option-title { color: #e2e8f0; }
+              .apa-modal.dark .apa-option-title { color: #F5F5F6; }
               .apa-option-sub {
                 margin-top: 2px;
                 font-size: 11px;
-                color: #6c8a88;
+                color: #4F5D75;
               }
-              .apa-modal.dark .apa-option-sub { color: #94a3b8; }
+              .apa-modal.dark .apa-option-sub { color: #B7BAC7; }
               .apa-radio {
                 width: 18px;
                 height: 18px;
-                accent-color: #00b0a5;
+                accent-color: #EF8354;
                 flex-shrink: 0;
               }
               .apa-preview {
@@ -244,15 +261,15 @@ const AdminPackageAvailabilityModal = ({ pkg, onClose, dark = false }) => {
                 gap: 10px;
                 padding: 12px 14px;
                 border-radius: 14px;
-                background: rgba(0, 176, 165, 0.08);
-                border: 1px solid rgba(0, 176, 165, 0.16);
+                background: rgba(239, 131, 84, 0.08);
+                border: 1px solid rgba(239, 131, 84, 0.2);
                 font-size: 12px;
                 font-weight: 700;
-                color: #0d2b2b;
+                color: #2D3142;
               }
               .apa-modal.dark .apa-preview {
-                background: rgba(0, 176, 165, 0.12);
-                color: #e2e8f0;
+                background: rgba(239, 131, 84, 0.12);
+                color: #F5F5F6;
               }
               .apa-actions {
                 display: flex;
@@ -264,27 +281,28 @@ const AdminPackageAvailabilityModal = ({ pkg, onClose, dark = false }) => {
                 align-items: center;
                 justify-content: center;
                 gap: 8px;
-                padding: 11px 14px;
-                border-radius: 10px;
-                border: 1px solid rgba(0, 176, 165, 0.18);
+                padding: 12px 16px;
+                border-radius: 12px;
+                border: 1px solid #E8E8EA;
                 background: #fff;
-                color: #0d2b2b;
+                color: #4F5D75;
                 cursor: pointer;
                 font-size: 12px;
                 font-weight: 800;
+                transition: all 0.15s ease;
               }
               .apa-modal.dark .apa-action-btn {
-                background: #0b1220;
-                color: #e2e8f0;
-                border-color: rgba(255, 255, 255, 0.1);
+                background: #2D3142;
+                color: #F5F5F6;
+                border-color: rgba(255, 255, 255, 0.12);
               }
               .apa-save {
                 flex: 1 1 180px;
-                background: #00b0a5;
+                background: #EF8354;
                 color: #fff;
-                border-color: #00b0a5;
+                border-color: #EF8354;
               }
-              .apa-save:hover { background: #009e94; }
+              .apa-save:hover { background: #d96e41; border-color: #d96e41; }
               .apa-error {
                 padding: 10px 12px;
                 border-radius: 12px;

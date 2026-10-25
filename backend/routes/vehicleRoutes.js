@@ -16,6 +16,7 @@ router.delete('/categories/:id', verifyToken, adminOnly, vehicleCtrl.deleteCateg
 router.get('/stats', vehicleCtrl.getStats);
 router.get('/category/:categoryId', vehicleCtrl.listVehiclesByCategory);
 router.get('/', vehicleCtrl.listVehicles);
+router.get('/available', vehicleCtrl.getAvailableVehicles);
 router.get('/:id', vehicleCtrl.getVehicleById);
 router.post('/', verifyToken, adminOnly, vehicleUpload.array('images', 10), vehicleCtrl.createVehicle);
 router.put('/:id', verifyToken, adminOnly, vehicleUpload.array('images', 10), vehicleCtrl.updateVehicle);

@@ -72,7 +72,7 @@ const MyMessageThread = ({ message, onSendFollowUp }) => {
               placeholder="Type your follow-up message..." rows={2}
               className="flex-1 p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-[#EF8354] outline-none text-sm resize-none" />
             <button onClick={handleSend} disabled={!followUp.trim()}
-              className="self-end flex items-center gap-2 bg-slate-900 text-white px-4 py-3 rounded-xl font-semibold hover:bg-slate-800 transition-colors disabled:opacity-40">
+              className="self-end flex items-center gap-2 bg-[#EF8354] hover:bg-[#4F5D75] text-white px-4 py-3 rounded-xl font-bold transition-colors disabled:opacity-40 cursor-pointer shadow-md shadow-[#EF8354]/20">
               <Send className="w-4 h-4" />
             </button>
           </div>

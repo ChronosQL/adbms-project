@@ -63,9 +63,10 @@ const EMERGENCY_RELATIONSHIPS = [
 const inputClass = "w-full px-4 py-3 bg-white border border-[#EF8354]/15 rounded-xl text-[#2D3142] text-sm outline-none transition-all focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20";
 
 // ── Phone validation with country code min/max ────────────────────────────────
-const validatePhone = (digits, countryCode) => {
+const validatePhone = (digits, countryCode, exactDigits = null) => {
   if (!digits) return "Phone number is required.";
   if (!/^\d+$/.test(digits)) return "Only digits allowed — no spaces or dashes.";
+  if (exactDigits && digits.length !== exactDigits) return "Enter exactly 9 digits after the country code.";
   const country = COUNTRIES.find(c => c.code === countryCode);
   if (!country) return digits.length < 7 ? "Too short." : digits.length > 15 ? "Too long." : "";
   if (digits.length < country.minLen) return `Too short for ${country.name} — need ${country.minLen} digits (entered ${digits.length}).`;
@@ -74,30 +75,36 @@ const validatePhone = (digits, countryCode) => {
 };
 
 // ── Reusable phone input with country dropdown ────────────────────────────────
-const PhoneInput = ({ value, onChange, label, required, theme = "orange" }) => {
+const PhoneInput = ({ value, onChange, label, required, exactDigits = null }) => {
   const [touched, setTouched] = useState(false);
 
   const parseCode = () => {
     if (!value) return "+94";
-    const match = COUNTRIES.find(c => value.startsWith(c.code + " "));
-    return match ? match.code : "+94";
+    const spacedMatch = COUNTRIES.find(c => value.startsWith(c.code + " "));
+    if (spacedMatch) return spacedMatch.code;
+    const compactMatch = [...COUNTRIES]
+      .sort((a, b) => b.code.length - a.code.length)
+      .find(c => value.startsWith(c.code) && /^\d{9}$/.test(value.slice(c.code.length)));
+    return compactMatch ? compactMatch.code : "+94";
   };
 
   const parseNumber = () => {
     if (!value) return "";
     const code = parseCode();
-    return value.startsWith(code + " ") ? value.slice(code.length + 1) : value;
+    if (value.startsWith(code + " ")) return value.slice(code.length + 1);
+    if (value.startsWith(code)) return value.slice(code.length).replace(/\D/g, "");
+    return value;
   };
 
   const code    = parseCode();
   const number  = parseNumber();
   const country = COUNTRIES.find(c => c.code === code) || COUNTRIES[0];
   const digits  = number.replace(/\s/g, "");
-  const error   = touched ? validatePhone(digits, code) : "";
-  const isValid = !validatePhone(digits, code) && digits.length > 0;
+  const error   = touched ? validatePhone(digits, code, exactDigits) : "";
+  const isValid = !validatePhone(digits, code, exactDigits) && digits.length > 0;
 
   const handleCodeChange = (newCode) => onChange(`${newCode} ${parseNumber()}`);
-  const handleNumChange  = (val) => onChange(`${code} ${val.replace(/[^\d\s]/g, "")}`);
+  const handleNumChange  = (val) => onChange(code + " " + (exactDigits ? val.replace(/\D/g, "").slice(0, exactDigits) : val.replace(/[^\d\s]/g, "")));
 
   return (
     <div>
@@ -130,7 +137,9 @@ const PhoneInput = ({ value, onChange, label, required, theme = "orange" }) => {
             value={number}
             onChange={e => handleNumChange(e.target.value)}
             onBlur={() => setTouched(true)}
-            placeholder={`${country.minLen} digits`}
+            maxLength={exactDigits || undefined}
+            inputMode={exactDigits ? "numeric" : "tel"}
+            placeholder={exactDigits ? "9 digits" : country.minLen + " digits"}
             className={`${inputClass} pr-9 ${
               touched && error   ? "border-red-400 focus:ring-red-400/20 focus:border-red-400"
               : touched && isValid ? "border-green-400 focus:ring-green-400/20 focus:border-green-400"
@@ -205,6 +214,7 @@ const PlatformRow = ({ index, platform, number, onChange, onRemove, required, us
           value={number}
           onChange={val => onChange("number", val)}
           required={required}
+          exactDigits={index === 0 ? 9 : null}
         />
       ) : (
         /* Non-numeric → plain text input */

@@ -20,6 +20,8 @@ test('Schema Regression: Dropped tables must not exist in schema.sql', (t) => {
     'booking_custom_activities',
     'booking_custom_itinerary',
     'custom_activity',
+    'chat_topic',
+    'chat_message',
   ];
 
   for (const tableName of droppedTables) {
@@ -100,6 +102,7 @@ test('Schema Regression: server.js must not mount obsolete routes and deleted ro
     'galleryRoutes',
     'locationRoutes',
     'activityRoutes',
+    'otpRoutes',
   ];
 
   for (const route of obsoleteRoutes) {
@@ -113,9 +116,11 @@ test('Schema Regression: server.js must not mount obsolete routes and deleted ro
     path.join(BACKEND_DIR, 'routes', 'galleryRoutes.js'),
     path.join(BACKEND_DIR, 'routes', 'locationRoutes.js'),
     path.join(BACKEND_DIR, 'routes', 'activityRoutes.js'),
+    path.join(BACKEND_DIR, 'routes', 'otpRoutes.js'),
     path.join(BACKEND_DIR, 'controllers', 'galleryController.js'),
     path.join(BACKEND_DIR, 'controllers', 'locationController.js'),
     path.join(BACKEND_DIR, 'controllers', 'activityController.js'),
+    path.join(BACKEND_DIR, 'controllers', 'otpController.js'),
   ];
 
   for (const file of obsoleteFiles) {

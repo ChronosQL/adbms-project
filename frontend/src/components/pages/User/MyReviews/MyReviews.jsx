@@ -5,6 +5,7 @@ import { useBookings } from '../../../../context/BookingsContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { buildApiUrl } from '../../../../config/api';
 import { fetchPublishedReviews } from '../../Site/Reviews/reviewsApi';
+import Pagination from '../../../common/Pagination';
 
 const MyReviews = ({ isEmbedded = false }) => {
   const navigate = useNavigate();
@@ -14,6 +15,8 @@ const MyReviews = ({ isEmbedded = false }) => {
   const [loading, setLoading] = useState(true);
   const [expandedComments, setExpandedComments] = useState(new Set());
   const [expandedImages, setExpandedImages] = useState(new Set());
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(6);
 
   const userEmail = user?.email;
 
@@ -127,11 +130,15 @@ const MyReviews = ({ isEmbedded = false }) => {
     return () => window.removeEventListener('reviews:updated', handler);
   }, [userEmail, refreshReviews, getCustomerBookings]);
 
+  const totalReviewPages = Math.ceil(myReviews.length / limit) || 1;
+  const currentReviewPage = Math.min(page, totalReviewPages);
+  const paginatedReviews = myReviews.slice((currentReviewPage - 1) * limit, currentReviewPage * limit);
+
   return (
     <>
       <style>{`
         .mr-wrap {
-          ${isEmbedded ? 'padding: 24px; background: transparent;' : 'max-width: 1200px; margin: 0 auto; padding: 24px; min-height: 100vh; background: #f7fffe;'}
+          ${isEmbedded ? 'padding: 24px; background: transparent;' : 'max-width: 1200px; margin: 0 auto; padding: 24px; min-height: 100vh; background: #F8F9FA;'}
         }
 
         .mr-header {
@@ -144,14 +151,14 @@ const MyReviews = ({ isEmbedded = false }) => {
         }
         .mr-title {
           font-size: 28px; font-weight: 800;
-          color: #0d2b2b; letter-spacing: -0.02em;
+          color: #2D3142; letter-spacing: -0.02em;
         }
 
         .mr-back-btn {
-          ${isEmbedded ? 'display: none;' : 'padding: 10px 20px; border-radius: 10px; border: 1.5px solid rgba(0,176,165,0.3); background: transparent; color: #EF8354; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.2s ease;'}
+          ${isEmbedded ? 'display: none;' : 'padding: 10px 20px; border-radius: 10px; border: 1.5px solid rgba(239,131,84,0.3); background: transparent; color: #EF8354; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.2s ease;'}
         }
         .mr-back-btn:hover {
-          background: rgba(0,176,165,0.08);
+          background: rgba(239,131,84,0.08);
           border-color: #EF8354;
         }
 
@@ -162,15 +169,15 @@ const MyReviews = ({ isEmbedded = false }) => {
         .mr-section-title {
           font-size: 14px; font-weight: 700;
           letter-spacing: 0.1em; text-transform: uppercase;
-          color: #3a5a5a;
+          color: #4F5D75;
           margin-bottom: 16px;
           padding-bottom: 12px;
-          border-bottom: 2px solid rgba(0,176,165,0.15);
+          border-bottom: 2px solid rgba(239,131,84,0.15);
         }
 
         .mr-notification-card {
-          background: linear-gradient(135deg, rgba(0,176,165,0.06), rgba(0,220,205,0.04));
-          border: 1.5px solid rgba(0,176,165,0.25);
+          background: rgba(239,131,84,0.05);
+          border: 1.5px solid rgba(239,131,84,0.2);
           border-radius: 14px;
           padding: 20px;
           display: flex;
@@ -181,9 +188,9 @@ const MyReviews = ({ isEmbedded = false }) => {
           transition: all 0.2s ease;
         }
         .mr-notification-card:hover {
-          background: linear-gradient(135deg, rgba(0,176,165,0.1), rgba(0,220,205,0.08));
+          background: rgba(239,131,84,0.08);
           border-color: #EF8354;
-          box-shadow: 0 4px 16px rgba(0,176,165,0.15);
+          box-shadow: 0 4px 16px rgba(239,131,84,0.12);
         }
 
         .mr-notif-icon {
@@ -194,13 +201,13 @@ const MyReviews = ({ isEmbedded = false }) => {
         }
         .mr-notif-title {
           font-size: 14px; font-weight: 700;
-          color: #0d2b2b;
+          color: #2D3142;
           margin-bottom: 4px;
           overflow-wrap: anywhere;
           word-break: break-word;
         }
         .mr-notif-subtitle {
-          font-size: 12px; color: #5a8080;
+          font-size: 12px; color: #4F5D75;
           font-weight: 400;
           overflow-wrap: anywhere;
           word-break: break-word;
@@ -223,12 +230,12 @@ const MyReviews = ({ isEmbedded = false }) => {
         }
 
         .mr-cta-btn.reviewed {
-          background: #c0d8d5;
-          color: #3a5a5a;
+          background: #E8E8EA;
+          color: #4F5D75;
           cursor: not-allowed;
         }
         .mr-cta-btn.reviewed:hover {
-          background: #c0d8d5;
+          background: #E8E8EA;
           transform: none;
         }
 
@@ -241,18 +248,19 @@ const MyReviews = ({ isEmbedded = false }) => {
 
         .mr-review-card {
           background: #fff;
-          border: 1px solid rgba(0,176,165,0.1);
+          border: 1px solid rgba(239,131,84,0.15);
           border-radius: 16px;
           padding: 20px;
           display: flex;
           flex-direction: column;
           gap: 12px;
           transition: all 0.3s ease;
-          box-shadow: 0 2px 12px rgba(0,60,50,0.05);
+          box-shadow: 0 2px 12px rgba(45,49,66,0.05);
         }
         .mr-review-card:hover {
-          box-shadow: 0 8px 24px rgba(0,60,50,0.12);
+          box-shadow: 0 8px 24px rgba(239,131,84,0.12);
           transform: translateY(-2px);
+          border-color: #EF8354;
         }
 
         .mr-review-header {
@@ -263,7 +271,7 @@ const MyReviews = ({ isEmbedded = false }) => {
         }
         .mr-review-title {
           font-size: 14px; font-weight: 800;
-          color: #0d2b2b;
+          color: #2D3142;
           line-height: 1.4;
           flex: 1;
           min-width: 0;
@@ -278,7 +286,7 @@ const MyReviews = ({ isEmbedded = false }) => {
         }
 
         .mr-review-meta {
-          font-size: 11px; color: #7a9a9a;
+          font-size: 11px; color: #4F5D75;
           display: flex; gap: 8px; flex-wrap: wrap;
           overflow-wrap: anywhere;
           word-break: break-word;
@@ -292,7 +300,7 @@ const MyReviews = ({ isEmbedded = false }) => {
 
         .mr-review-comment {
           font-size: 13px; font-weight: 300;
-          color: #4a7070; line-height: 1.6;
+          color: #4F5D75; line-height: 1.6;
           overflow-wrap: anywhere;
           word-break: break-word;
           white-space: normal;
@@ -324,7 +332,7 @@ const MyReviews = ({ isEmbedded = false }) => {
           height: 56px;
           object-fit: cover;
           border-radius: 10px;
-          border: 1px solid rgba(0,176,165,0.12);
+          border: 1px solid rgba(239,131,84,0.15);
         }
 
         .mr-image-expand-btn {
@@ -334,8 +342,8 @@ const MyReviews = ({ isEmbedded = false }) => {
           width: 72px;
           height: 56px;
           border-radius: 10px;
-          border: 1.5px solid rgba(0,176,165,0.25);
-          background: rgba(0,176,165,0.08);
+          border: 1.5px solid rgba(239,131,84,0.25);
+          background: rgba(239,131,84,0.08);
           color: #EF8354;
           font-size: 12px;
           font-weight: 700;
@@ -343,7 +351,7 @@ const MyReviews = ({ isEmbedded = false }) => {
           transition: all 0.2s ease;
         }
         .mr-image-expand-btn:hover {
-          background: rgba(0,176,165,0.15);
+          background: rgba(239,131,84,0.15);
           border-color: #EF8354;
           transform: scale(1.05);
         }
@@ -356,10 +364,10 @@ const MyReviews = ({ isEmbedded = false }) => {
         .mr-empty-icon { font-size: 48px; }
         .mr-empty-title {
           font-size: 1.1rem; font-weight: 800;
-          color: #0d2b2b;
+          color: #2D3142;
         }
         .mr-empty-subtitle {
-          font-size: 13px; color: #5a8080;
+          font-size: 13px; color: #4F5D75;
           max-width: 360px; line-height: 1.6;
         }
 
@@ -380,7 +388,7 @@ const MyReviews = ({ isEmbedded = false }) => {
 
         .mr-loading {
           text-align: center; padding: 40px 24px;
-          font-size: 14px; color: #5a8080;
+          font-size: 14px; color: #4F5D75;
         }
 
         @media(max-width: 768px) {
@@ -468,9 +476,10 @@ const MyReviews = ({ isEmbedded = false }) => {
               )}
             </div>
           ) : (
-            <div className="mr-reviews-grid">
-              <AnimatePresence>
-                {myReviews.map((review, i) => (
+            <>
+              <div className="mr-reviews-grid">
+                <AnimatePresence>
+                  {paginatedReviews.map((review, i) => (
                   <motion.div
                     key={review.id}
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -488,7 +497,7 @@ const MyReviews = ({ isEmbedded = false }) => {
                             className="mr-review-star"
                             viewBox="0 0 18 18"
                             fill={s <= review.stars ? '#EF8354' : 'none'}
-                            stroke={s <= review.stars ? '#EF8354' : '#c0d8d5'}
+                            stroke={s <= review.stars ? '#EF8354' : '#BFC0C0'}
                             strokeWidth="1.5"
                           >
                             <path d="M9 1.5l2.1 4.3 4.7.7-3.4 3.3.8 4.7L9 12.1l-4.2 2.4.8-4.7-3.4-3.3 4.7-.7L9 1.5z" />
@@ -560,7 +569,27 @@ const MyReviews = ({ isEmbedded = false }) => {
                 ))}
               </AnimatePresence>
             </div>
-          )}
+            {myReviews.length > limit && (
+              <div style={{ marginTop: 24 }}>
+                <Pagination
+                  pagination={{
+                    page: currentReviewPage,
+                    totalPages: totalReviewPages,
+                    total: myReviews.length,
+                    limit,
+                  }}
+                  onPageChange={setPage}
+                  onLimitChange={(newLimit) => {
+                    setLimit(newLimit);
+                    setPage(1);
+                  }}
+                  limitOptions={[6, 12, 24]}
+                  itemLabel="reviews"
+                />
+              </div>
+            )}
+          </>
+        )}
         </div>
       </div>
     </>
