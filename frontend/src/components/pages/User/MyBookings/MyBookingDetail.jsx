@@ -1,7 +1,7 @@
 // components/pages/User/MyBookings/MyBookingDetail.jsx
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
-import { ArrowLeft, MapPin, Calendar, Users, Car, Phone, FileText, Clock, Baby, Briefcase, Check, X, Zap, AlertTriangle, Download } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Users, Car, Phone, FileText, Clock, Baby, Briefcase, Check, X, Zap, AlertTriangle, Download, MessageSquare } from "lucide-react";
 import { STATUS_STYLES, TOUR_TYPE_LABEL } from "./MyBookingCard";
 import { useBookings } from "../../../../context/BookingsContext.jsx";
 import BookingWeatherPanel from "./BookingWeatherPanel";
@@ -139,6 +139,15 @@ const MyBookingDetail = ({ booking, onBack }) => {
               ❌ You rejected this quote. Feel free to submit a new booking.
             </p>
           )}
+          {booking.status === "COMPLETED" && (
+            <button
+              onClick={() => navigate("/reviews")}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[#2F9E44]/20 bg-[#2F9E44]/5 px-3 py-2 text-sm font-semibold text-[#2F9E44] transition-colors hover:bg-[#2F9E44]/10"
+            >
+              <MessageSquare className="h-4 w-4" />
+              You can add reviews now
+            </button>
+          )}
           {canDownloadPdf && (
             <button
               onClick={handleDownloadPdf}
@@ -157,6 +166,11 @@ const MyBookingDetail = ({ booking, onBack }) => {
             <p className="text-2xl font-bold text-[#EF8354] mb-1">
               LKR {Number(booking.quotedPrice).toLocaleString('en-LK')}
             </p>
+            {booking.tourType === "PACKAGE" && (
+              <p className="mb-3 rounded-xl border border-[#E3A857]/25 bg-[#E3A857]/10 px-3 py-2 text-xs leading-relaxed text-[#4F5D75]">
+                This price covers the vehicle only, not the whole trip. Additional tolls may apply along the way.
+              </p>
+            )}
 
             {booking.adminNote && (
               <div className="bg-white rounded-xl border border-blue-100 px-4 py-3 mb-3">

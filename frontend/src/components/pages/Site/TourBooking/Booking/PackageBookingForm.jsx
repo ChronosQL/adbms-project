@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Send, Lock, CheckCircle, AlertCircle } from 
 import { AuthContext } from "../../../../../context/AuthContext";
 import { submitPackageBooking, updateBooking, fetchMyBookings } from "../../../../../services/bookingService";
 import BookingStepIndicator from "./BookingStepIndicator";
+import { isValidPrimaryPhone } from "../../../../../utils/bookingValidation";
 import BookingPassengersStep from "./BookingPassengersStep";
 import BookingNotesStep from "./BookingNotesStep";
 import P2PReviewStep from "../PointToPoint/P2PReviewStep";
@@ -152,7 +153,7 @@ const validateStep = (step, data) => {
     case 0: return data.startDate && data.endDate && data.pickupTime;
     case 1:
       return data.noOfAdults >= 1 && data.categoryId && areChildAgesValid(data.noOfChildren, data.agesOfChildren);
-    case 2: return data.customerName.trim() && (data.contactNumber || '').trim();
+    case 2: return data.customerName.trim() && isValidPrimaryPhone(data.contactPlatform, data.contactNumber);
     case 3: return true;
     default: return false;
   }

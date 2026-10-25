@@ -61,6 +61,23 @@ test('Booking DTO: validateBookingPayload enforces mandatory fields and rejects 
   assert.equal(bookingDto.validateBookingPayload(validP2P, false).valid, true);
 });
 
+test('Booking DTO: numeric primary phone requires exactly nine local digits for create and update', () => {
+  const payload = (overrides = {}) => bookingDto.extractBookingPayload({
+    tourType: 'P2P', customerName: 'Jane Smith', contactPlatform: 'mobile',
+    contactNumber: '+94770000000', startDate: '2026-11-01', endDate: '2026-11-05',
+    categoryId: 1, startLocation: 'Colombo', endLocation: 'Kandy', ...overrides,
+  });
+
+  assert.equal(bookingDto.validateBookingPayload(payload()).valid, true);
+  assert.equal(bookingDto.validateBookingPayload(payload({ contactNumber: '+94 770000000' })).valid, true);
+  assert.equal(bookingDto.validateBookingPayload(payload({ contactNumber: '+94 77000000' })).valid, false);
+  assert.equal(bookingDto.validateBookingPayload(payload({ contactNumber: '+94 7700000000' })).valid, false);
+  assert.equal(bookingDto.validateBookingPayload(payload({ contactNumber: '+94 77ABC0000' })).valid, false);
+  assert.equal(bookingDto.validateBookingPayload(payload({ tourType: 'PACKAGE', packageId: 4 })).valid, true);
+  assert.equal(bookingDto.validateBookingPayload(payload({ contactNumber: '+9477000000' }), true).valid, false);
+  assert.equal(bookingDto.validateBookingPayload(payload({ contactPlatform: 'telegram', contactNumber: '@jane' })).valid, true);
+});
+
 test('Booking DTO: mapBooking transforms view rows correctly', () => {
   const mockRow = {
     booking_id: 101,

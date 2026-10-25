@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Send, Lock, MapPin, CheckCircle } from "luci
 import { AuthContext } from "../../../../../context/AuthContext";
 import { submitP2PBooking, updateBooking } from "../../../../../services/bookingService";
 import BookingStepIndicator from "../Booking/BookingStepIndicator";
+import { isValidPrimaryPhone } from "../../../../../utils/bookingValidation";
 import P2PTripStep from "./P2PTripStep";
 import BookingPassengersStep from "../Booking/BookingPassengersStep";
 import BookingNotesStep from "../Booking/BookingNotesStep";
@@ -140,7 +141,7 @@ const validateStep = (step, data) => {
   switch (step) {
     case 0: return data.startLocation.trim() && data.endLocation.trim() && data.startDate && data.endDate && data.pickupTime;
     case 1: return data.noOfAdults >= 1 && data.categoryId && areChildAgesValid(data.noOfChildren, data.agesOfChildren);
-    case 2: return data.customerName.trim() && (data.contactNumber || '').trim();
+    case 2: return data.customerName.trim() && isValidPrimaryPhone(data.contactPlatform, data.contactNumber);
     case 3: return true;
     default: return false;
   }

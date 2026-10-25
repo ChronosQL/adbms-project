@@ -21,21 +21,14 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState(booking.vehicleId ? String(booking.vehicleId) : "");
 
-  const { getPaymentsForBooking, recordPayment, updateAdditionalCharges } = useBookings();
+  const { getPaymentsForBooking, updateAdditionalCharges } = useBookings();
   const [paymentsData, setPaymentsData] = useState(null);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
-  const [recInstallment, setRecInstallment] = useState("");
-  const [recAmount, setRecAmount] = useState("");
-  const [recMethod, setRecMethod] = useState("CASH");
-  const [recDate, setRecDate] = useState(new Date().toISOString().split("T")[0]);
-  const [recSlipFile, setRecSlipFile] = useState(null);
-  const [recNotes, setRecNotes] = useState("");
-  const [recError, setRecError] = useState("");
-  const [recSuccess, setRecSuccess] = useState("");
-  const [recSubmitting, setRecSubmitting] = useState(false);
 
   const [addlChargeInput, setAddlChargeInput] = useState("");
   const [addlChargeSaving, setAddlChargeSaving] = useState(false);
+  const [addlChargeError, setAddlChargeError] = useState("");
+  const [addlChargeSuccess, setAddlChargeSuccess] = useState("");
 
   const bg     = dark ? "#0f172a" : "#f8fafc";
   const card   = dark ? "#1e293b" : "#ffffff";
@@ -51,13 +44,6 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
     getPaymentsForBooking(booking.id)
       .then(data => {
         setPaymentsData(data);
-        if (data && data.remainingAmount > 0) {
-          setRecInstallment('PARTIAL');
-          setRecAmount(data.payableAmount ?? data.remainingAmount);
-        } else {
-          setRecInstallment("");
-          setRecAmount("");
-        }
       })
       .catch(err => console.error("Error fetching booking payments:", err))
       .finally(() => setPaymentsLoading(false));
@@ -133,9 +119,6 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
     loadPayments();
     loadCategories();
     loadVehicles(booking.categoryId);
-    setRecNotes("");
-    setRecError("");
-    setRecSuccess("");
   }, [booking]);
 
   useEffect(() => {
@@ -176,63 +159,23 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
     }
   }, [selectedVehicleId, vehicles]);
 
-  const handleRecordPayment = async (e) => {
-    e.preventDefault();
-    if (!recInstallment) { setRecError("Select installment type"); return; }
-    const amt = parseFloat(recAmount);
-    if (isNaN(amt) || amt <= 0) { setRecError("Enter a valid amount"); return; }
-    if (paymentsData && Math.round(amt * 100) > Math.round(Number(paymentsData.payableAmount ?? paymentsData.remainingAmount) * 100)) { setRecError("Amount exceeds the balance currently available to pay."); return; }
-    if (!recDate) { setRecError("Select received date"); return; }
-
-    const isCash = recMethod === "CASH";
-    const isCashAllowed = booking.status === "TOUR_STARTED" || booking.status === "COMPLETED";
-    if (isCash && !isCashAllowed) {
-      setRecError(`Cash payments can only be recorded when the tour status is TOUR_STARTED or COMPLETED (Current status: ${booking.status}).`);
-      return;
-    }
-
-    setRecSubmitting(true);
-    setRecError("");
-    setRecSuccess("");
-    try {
-      const paymentPayload = new FormData();
-      paymentPayload.append("booking_id", booking.id);
-      paymentPayload.append("installment", paymentsData && amt >= Number(paymentsData.payableAmount ?? paymentsData.remainingAmount) ? "FULL" : "PARTIAL");
-      paymentPayload.append("amount", String(amt));
-      paymentPayload.append("payment_method", recMethod);
-      paymentPayload.append("received_date", recDate);
-      paymentPayload.append("notes", recNotes.trim());
-      if (recSlipFile) paymentPayload.append("slip", recSlipFile);
-      await recordPayment(paymentPayload);
-      setRecSuccess("Payment recorded successfully!");
-      setRecNotes("");
-      setRecSlipFile(null);
-      loadPayments();
-    } catch (err) {
-      console.error(err);
-      setRecError(err.message || "Failed to record payment");
-    } finally {
-      setRecSubmitting(false);
-    }
-  };
-
   const handleAddlCharge = async (e) => {
     e.preventDefault();
-    setRecError("");
-    setRecSuccess("");
+    setAddlChargeError("");
+    setAddlChargeSuccess("");
     if (!addlChargeInput || isNaN(Number(addlChargeInput))) {
-      setRecError("Please enter a valid amount.");
+      setAddlChargeError("Please enter a valid amount.");
       return;
     }
     try {
       setAddlChargeSaving(true);
       await updateAdditionalCharges(booking.id, addlChargeInput);
-      setRecSuccess("Additional charges updated successfully!");
+      setAddlChargeSuccess("Additional charges updated successfully!");
       setAddlChargeInput("");
       loadPayments();
     } catch (err) {
       console.error(err);
-      setRecError(err.message || "Failed to update additional charges");
+      setAddlChargeError(err.message || "Failed to update additional charges");
     } finally {
       setAddlChargeSaving(false);
     }
@@ -600,6 +543,8 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
               {/* Additional Charges Form */}
               {booking.tourType !== 'P2P' && paymentsData && (
                 <form onSubmit={handleAddlCharge} style={{ borderTop: `1px solid ${border}`, paddingTop: 15, paddingBottom: 15 }}>
+                  {addlChargeError && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#ef4444", fontWeight: 600 }}>{addlChargeError}</p>}
+                  {addlChargeSuccess && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#2F9E44", fontWeight: 600 }}>{addlChargeSuccess}</p>}
                   <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: tm }}>➕ Add Additional Mileage Charges</p>
                   
                   {paymentsData.paidAmount < paymentsData.baseAmount ? (
@@ -631,121 +576,7 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
                 </form>
               )}
 
-              {/* Record Form */}
-              {booking.status === "CLOSED" || booking.status === "CANCELLED" ? (
-                <div style={{ borderTop: `1px solid ${border}`, paddingTop: 15, textAlign: "center" }}>
-                  <p style={{ margin: 0, fontSize: 12, color: ts, fontWeight: 700 }}>
-                    🔒 Booking is {booking.status.toLowerCase()}. No further payments can be initiated or recorded.
-                  </p>
-                </div>
-              ) : !["TOUR_STARTED", "COMPLETED"].includes(booking.status) ? (
-                <div style={{ borderTop: `1px solid ${border}`, paddingTop: 15, textAlign: "center" }}>
-                  <p style={{ margin: 0, fontSize: 12, color: ts, fontWeight: 700 }}>
-                    ⏳ Payment recording will become available once the tour has started (Current Status: {booking.status.replace("_", " ")}).
-                  </p>
-                </div>
-              ) : paymentsData && paymentsData.remainingAmount > 0 ? (
-                <form onSubmit={handleRecordPayment} style={{ borderTop: `1px solid ${border}`, paddingTop: 15 }}>
-                  <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 800, color: tm }}>✍️ Record Received Payment</p>
-                  
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-                    <div>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: ts, display: "block", marginBottom: 4 }}>Installment Type *</label>
-                      <select value={recInstallment} onChange={e => {
-                        setRecInstallment(e.target.value);
-                        if (e.target.value === 'FULL') setRecAmount(paymentsData.payableAmount ?? paymentsData.remainingAmount);
-                      }} style={inputStyle}>
-                        <option value="PARTIAL">Installment / partial amount</option>
-                        <option value="FULL">Pay all currently payable</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: ts, display: "block", marginBottom: 4 }}>Amount Received (LKR) *</label>
-                      <input 
-                        type="number" 
-                        min="0.01"
-                        max={paymentsData.payableAmount ?? paymentsData.remainingAmount}
-                        step="0.01"
-                        value={recAmount} 
-                        onChange={e => setRecAmount(e.target.value)} 
-                        placeholder="0.00" 
-                        style={inputStyle} 
-                      />
-                    </div>
 
-                    <div>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: ts, display: "block", marginBottom: 4 }}>Payment Method</label>
-                      <select
-                        value={recMethod}
-                        onChange={e => setRecMethod(e.target.value)}
-                        style={inputStyle}
-                      >
-                        <option value="CASH" style={{ color: "#0f172a", background: "#ffffff" }}>💵 Cash (Desk Receipt)</option>
-                        <option value="BANK_TRANSFER" style={{ color: "#0f172a", background: "#ffffff" }}>🏦 Bank Transfer</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: ts, display: "block", marginBottom: 4 }}>Date Received *</label>
-                      <input type="date" value={recDate} onChange={e => setRecDate(e.target.value)} style={inputStyle} />
-                    </div>
-                  </div>
-
-                  {recMethod === "BANK_TRANSFER" && (
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: ts, display: "block", marginBottom: 4 }}>Bank Receipt *</label>
-                      <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={e => setRecSlipFile(e.target.files?.[0] || null)} style={inputStyle} />
-                    </div>
-                  )}
-
-                  {recMethod === "CASH" && booking.status !== "TOUR_STARTED" && booking.status !== "COMPLETED" && (
-                    <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(227,168,87,0.12)", border: "1px solid #E3A857", marginBottom: 10 }}>
-                      <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "#E3A857" }}>
-                        ⚠️ Cash collection is only allowed when tour is in <strong>TOUR STARTED</strong> or <strong>COMPLETED</strong> status. (Current status: {booking.status})
-                      </p>
-                    </div>
-                  )}
-
-                  <div style={{ marginBottom: 10 }}>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: ts, display: "block", marginBottom: 4 }}>Notes (Optional)</label>
-                    <textarea 
-                      value={recNotes} 
-                      onChange={e => setRecNotes(e.target.value)} 
-                      placeholder="e.g. 50% deposit received in cash" 
-                      rows={2} 
-                      style={{ ...inputStyle, resize: "none" }} 
-                    />
-                  </div>
-
-                  {recError && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#ef4444", fontWeight: 600 }}>{recError}</p>}
-                  {recSuccess && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#2F9E44", fontWeight: 600 }}>{recSuccess}</p>}
-
-                  <button 
-                    type="submit" 
-                    disabled={recSubmitting || (recMethod === "CASH" && booking.status !== "TOUR_STARTED" && booking.status !== "COMPLETED")}
-                    style={{
-                      width: "100%",
-                      background: (recMethod === "CASH" && booking.status !== "TOUR_STARTED" && booking.status !== "COMPLETED") ? "#94a3b8" : "#EF8354",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 10,
-                      padding: 10,
-                      fontWeight: 700,
-                      fontSize: 13,
-                      cursor: (recMethod === "CASH" && booking.status !== "TOUR_STARTED" && booking.status !== "COMPLETED") ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    {recSubmitting ? "Recording..." : "💾 Record Payment"}
-                  </button>
-                </form>
-              ) : (
-                paymentsData && paymentsData.remainingAmount <= 0 && (
-                  <p style={{ margin: 0, fontSize: 12, color: "#2F9E44", fontWeight: 700, textAlign: "center" }}>
-                    🎉 Booking is fully paid.
-                  </p>
-                )
-              )}
             </div>
           )}
 

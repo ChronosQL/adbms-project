@@ -17,6 +17,19 @@ const formatDate = (val) => {
 
 const normalizeTourType = (value) => String(value || 'P2P').toUpperCase();
 
+const NUMERIC_CONTACT_PLATFORMS = new Set(['mobile', 'whatsapp', 'viber', 'signal']);
+const COUNTRY_CALLING_CODES = ['+1', '+7', '+20', '+27', '+31', '+33', '+34', '+39', '+41', '+44', '+46', '+47', '+48', '+49', '+55', '+60', '+61', '+62', '+64', '+65', '+66', '+81', '+82', '+84', '+86', '+91', '+92', '+94', '+880', '+966', '+971'];
+const hasNineDigitPrimaryPhone = (value) => {
+  const phone = String(value || '').trim();
+  return COUNTRY_CALLING_CODES.some((code) => {
+    const spacedLocal = phone.slice(code.length + 1).replace(/[\s-]/g, '');
+    const compactLocal = phone.slice(code.length).replace(/[\s-]/g, '');
+    const spaced = phone.startsWith(code + ' ') && /^\d{9}$/.test(spacedLocal);
+    const compact = phone.startsWith(code) && /^\d{9}$/.test(compactLocal);
+    return spaced || compact;
+  });
+};
+
 const getBookingReference = (tourType, bookingId) => {
   const type = normalizeTourType(tourType);
   const typeCode = type === 'PACKAGE' ? 'PKG' : 'P2P';
@@ -121,6 +134,11 @@ const validateBookingPayload = (payload, isUpdate = false) => {
     if (!payload.customerName || !payload.contactNumber || !payload.categoryId || !payload.startDate || !payload.endDate) {
       return { valid: false, message: 'Customer name, phone, vehicle category, start date, and end date are required.' };
     }
+  }
+
+  const contactPlatform = String(payload.contactPlatform || 'mobile').trim().toLowerCase();
+  if (NUMERIC_CONTACT_PLATFORMS.has(contactPlatform) && !hasNineDigitPrimaryPhone(payload.contactNumber)) {
+    return { valid: false, message: 'Primary phone number must contain exactly 9 digits, excluding the country code.' };
   }
 
   return { valid: true };
