@@ -1,12 +1,30 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MapPin, Calendar, Clock, Search, X, Loader2 } from "lucide-react";
+import { MapPin, Calendar, Clock, Search, X, Loader2, AlertTriangle } from "lucide-react";
 import { searchLocations } from "../../../../../services/locationService";
+
+export const isSameP2PLocation = (startLocation, endLocation, pickupCoords, dropoffCoords) => {
+  const start = (startLocation || "").trim().toLowerCase();
+  const end = (endLocation || "").trim().toLowerCase();
+  if (!start || !end) return false;
+  if (start === end) return true;
+  if (
+    pickupCoords?.lat != null &&
+    pickupCoords?.lng != null &&
+    dropoffCoords?.lat != null &&
+    dropoffCoords?.lng != null
+  ) {
+    const latDiff = Math.abs(Number(pickupCoords.lat) - Number(dropoffCoords.lat));
+    const lngDiff = Math.abs(Number(pickupCoords.lng) - Number(dropoffCoords.lng));
+    if (latDiff < 0.0001 && lngDiff < 0.0001) return true;
+  }
+  return false;
+};
 
 const inputClass =
   "w-full px-4 py-3 bg-white border border-[#EF8354]/15 rounded-xl text-[#2D3142] text-sm outline-none transition-all focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20";
 
 // ─── Keyboard-accessible Location Input ───────────────────────────────────────
-const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
+const LocationInput = ({ value, onChange, placeholder, pinColor, id, hasError = false }) => {
   const [query, setQuery] = useState(value || "");
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState([]);
@@ -170,7 +188,7 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className={`${inputClass} pl-9 pr-9`}
+          className={`${inputClass} pl-9 pr-9 ${hasError ? "!border-amber-500 !ring-2 !ring-amber-400/25" : ""}`}
           autoComplete="off"
         />
         {loading ? (
@@ -258,8 +276,14 @@ const LocationInput = ({ value, onChange, placeholder, pinColor, id }) => {
 
 // ─── Main Trip Step ────────────────────────────────────────────────────────────
 const P2PTripStep = ({ data, onChange }) => {
-  
   const today = new Date().toISOString().split("T")[0];
+
+  const isSameLocation = isSameP2PLocation(
+    data.startLocation,
+    data.endLocation,
+    { lat: data.pickupLat, lng: data.pickupLng },
+    { lat: data.dropoffLat, lng: data.dropoffLng }
+  );
 
   const handleDate = (val) => {
     onChange("startDate",    val);
@@ -326,8 +350,24 @@ const P2PTripStep = ({ data, onChange }) => {
               }}
               placeholder={"Search tourist spot, city, beach…"}
               pinColor="text-red-400"
+              hasError={isSameLocation}
             />
           </div>
+
+          {/* Warning when Pickup and Drop-off are identical */}
+          {isSameLocation && (
+            <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 shadow-xs">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-amber-800">
+                  Starting Place and Ending Destination Cannot Be the Same
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                  Point-to-point transfers require different pickup and drop-off destinations. Please select a different drop-off destination from your pickup location.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -369,7 +409,7 @@ const P2PTripStep = ({ data, onChange }) => {
           </div>
         </div>
 
-        {data.startDate && data.pickupTime && (
+        {data.startDate && data.pickupTime && !isSameLocation && (
           <div className="mt-4 bg-[#EF8354]/8 border border-[#EF8354]/25 rounded-xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 bg-[#EF8354]/10 rounded-full flex items-center justify-center flex-shrink-0">
               <Calendar className="w-5 h-5 text-[#EF8354]" />

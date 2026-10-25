@@ -1,15 +1,19 @@
+-- ============================================================================
+-- CEYLON BEST TOURS — DATABASE SCHEMA DEFINITION (schema.sql)
+-- ============================================================================
 -- Connect to your database or create it first:
 -- CREATE DATABASE tours;
 -- \c tours
+-- ============================================================================
 
--- =========================================================
--- Extensions
--- =========================================================
+-- ============================================================================
+-- 1. EXTENSIONS
+-- ============================================================================
 CREATE EXTENSION IF NOT EXISTS postgis;
 
--- =========================================================
--- Custom ENUM Types
--- =========================================================
+-- ============================================================================
+-- 2. CUSTOM ENUM TYPES
+-- ============================================================================
 DROP TYPE IF EXISTS user_role CASCADE;
 CREATE TYPE user_role AS ENUM ('ADMIN', 'CUSTOMER');
 
@@ -54,8 +58,6 @@ CREATE TYPE booking_status_type AS ENUM (
     'CANCELLED'
 );
 
-DROP TYPE IF EXISTS payment_installment_type CASCADE;
-
 DROP TYPE IF EXISTS payment_method_type CASCADE;
 CREATE TYPE payment_method_type AS ENUM ('CASH', 'BANK_TRANSFER');
 
@@ -65,21 +67,11 @@ CREATE TYPE inquiry_status_type AS ENUM ('new', 'read', 'replied');
 DROP TYPE IF EXISTS sender_role_type CASCADE;
 CREATE TYPE sender_role_type AS ENUM ('customer', 'admin');
 
--- =========================================================
--- Helper Trigger for updated_at
--- =========================================================
-DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- ============================================================================
+-- 3. CORE RELATIONAL TABLES (Ordered by Dependency)
+-- ============================================================================
 
--- =========================================================
--- User & Authentication
--- =========================================================
+-- 3.1 User & Authentication
 DROP TABLE IF EXISTS "user" CASCADE;
 CREATE TABLE "user" (
     user_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -101,15 +93,7 @@ CREATE TABLE "user" (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-DROP TRIGGER IF EXISTS trg_user_updated_at ON "user" CASCADE;
-CREATE TRIGGER trg_user_updated_at
-BEFORE UPDATE ON "user"
-FOR EACH ROW
-EXECUTE FUNCTION set_updated_at();
-
--- =========================================================
--- Fleet & Vehicles
--- =========================================================
+-- 3.2 Vehicle Category
 DROP TABLE IF EXISTS vehicle_category CASCADE;
 CREATE TABLE vehicle_category (
     category_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -124,6 +108,7 @@ CREATE TABLE vehicle_category (
     ideal_trip_types VARCHAR(255)
 );
 
+-- 3.3 Vehicle Fleet
 DROP TABLE IF EXISTS vehicle CASCADE;
 CREATE TABLE vehicle (
     vehicle_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -153,9 +138,7 @@ CREATE TABLE vehicle (
     CONSTRAINT fk_vehicle_category FOREIGN KEY (category_id) REFERENCES vehicle_category(category_id)
 );
 
--- =========================================================
--- Places & Activities
--- =========================================================
+-- 3.4 Places, Destinations & Tourist Attractions
 DROP TABLE IF EXISTS place CASCADE;
 CREATE TABLE place (
     place_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -167,55 +150,7 @@ CREATE TABLE place (
     geom GEOMETRY(Point, 4326)
 );
 
--- Spatial index for high-performance GIS queries
-DROP INDEX IF EXISTS idx_place_geom CASCADE;
-CREATE INDEX idx_place_geom ON place USING GIST (geom);
-
--- Trigger to keep coordinates and PostGIS point synchronized
-DROP FUNCTION IF EXISTS set_place_geom() CASCADE;
-CREATE OR REPLACE FUNCTION set_place_geom()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-        -- On INSERT: if coordinates are provided and geom is omitted, generate geom
-        IF NEW.geom IS NULL AND NEW.longitude IS NOT NULL AND NEW.latitude IS NOT NULL THEN
-            NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
-        -- On INSERT: if geom is provided and coordinates are omitted, extract coordinates
-        ELSIF NEW.geom IS NOT NULL AND (NEW.longitude IS NULL OR NEW.latitude IS NULL) THEN
-            NEW.longitude := ST_X(NEW.geom);
-            NEW.latitude  := ST_Y(NEW.geom);
-        END IF;
-
-    ELSIF TG_OP = 'UPDATE' THEN
-        -- On UPDATE: if coordinates changed, recompute geom
-        IF NEW.longitude IS DISTINCT FROM OLD.longitude OR NEW.latitude IS DISTINCT FROM OLD.latitude THEN
-            IF NEW.longitude IS NOT NULL AND NEW.latitude IS NOT NULL THEN
-                NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
-            ELSE
-                NEW.geom := NULL;
-            END IF;
-        -- On UPDATE: if geom changed directly, update coordinates
-        ELSIF NEW.geom IS DISTINCT FROM OLD.geom THEN
-            IF NEW.geom IS NOT NULL THEN
-                NEW.longitude := ST_X(NEW.geom);
-                NEW.latitude  := ST_Y(NEW.geom);
-            ELSE
-                NEW.longitude := NULL;
-                NEW.latitude  := NULL;
-            END IF;
-        END IF;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_place_geom ON place CASCADE;
-CREATE TRIGGER trg_place_geom
-BEFORE INSERT OR UPDATE ON place
-FOR EACH ROW
-EXECUTE FUNCTION set_place_geom();
-
+-- 3.5 Activities
 DROP TABLE IF EXISTS activity CASCADE;
 CREATE TABLE activity (
     activity_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -224,6 +159,7 @@ CREATE TABLE activity (
     description TEXT
 );
 
+-- 3.6 Place-Activity Mapping (Join Table)
 DROP TABLE IF EXISTS place_activity CASCADE;
 CREATE TABLE place_activity (
     id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -233,9 +169,7 @@ CREATE TABLE place_activity (
     CONSTRAINT fk_place_activity_activity FOREIGN KEY (activity_id) REFERENCES activity(activity_id)
 );
 
--- =========================================================
--- Packages
--- =========================================================
+-- 3.7 Tour Packages
 DROP TABLE IF EXISTS package CASCADE;
 CREATE TABLE package (
     package_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -248,6 +182,7 @@ CREATE TABLE package (
     availability_status availability_status_type NOT NULL DEFAULT 'AVAILABLE'
 );
 
+-- 3.8 Package Places & Itinerary (Join Table)
 DROP TABLE IF EXISTS package_place CASCADE;
 CREATE TABLE package_place (
     id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -261,31 +196,7 @@ CREATE TABLE package_place (
     CONSTRAINT fk_package_place_place FOREIGN KEY (place_id) REFERENCES place(place_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_package_place_geom ON package_place USING GIST (geom);
-
-CREATE OR REPLACE FUNCTION set_package_place_geom()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
-        IF NEW.longitude IS NOT NULL AND NEW.latitude IS NOT NULL THEN
-            NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
-        ELSE
-            NEW.geom := NULL;
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_package_place_geom ON package_place;
-CREATE TRIGGER trg_package_place_geom
-BEFORE INSERT OR UPDATE ON package_place
-FOR EACH ROW
-EXECUTE FUNCTION set_package_place_geom();
-
--- =========================================================
--- Bookings & Payments
--- =========================================================
+-- 3.9 Bookings
 DROP TABLE IF EXISTS booking CASCADE;
 CREATE TABLE booking (
     booking_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -348,12 +259,232 @@ CREATE TABLE booking (
     CONSTRAINT fk_booking_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehicle(vehicle_id)
 );
 
--- Spatial GIST indexes for booking
+-- 3.10 Booking Package Association
+DROP TABLE IF EXISTS booking_package CASCADE;
+CREATE TABLE booking_package (
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    booking_id INTEGER NOT NULL UNIQUE,
+    package_id INTEGER NOT NULL,
+    CONSTRAINT fk_booking_package_booking FOREIGN KEY (booking_id) REFERENCES booking(booking_id),
+    CONSTRAINT fk_booking_package_package FOREIGN KEY (package_id) REFERENCES package(package_id)
+);
+
+-- 3.11 Booking Status History (Audit Log)
+DROP TABLE IF EXISTS booking_status_history CASCADE;
+CREATE TABLE IF NOT EXISTS booking_status_history (
+    history_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    booking_id INTEGER NOT NULL REFERENCES booking(booking_id) ON DELETE CASCADE,
+    old_status booking_status_type,
+    new_status booking_status_type NOT NULL,
+    admin_note TEXT,
+    changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3.12 Payments & Cash Register
+DROP TABLE IF EXISTS payment CASCADE;
+CREATE TABLE payment (
+    payment_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    booking_id INTEGER NOT NULL,
+    installment VARCHAR(20) NOT NULL DEFAULT 'FULL',
+    amount NUMERIC(10,2) NOT NULL,
+    payment_method payment_method_type NOT NULL,
+    received_date DATE,
+    recorded_by INTEGER,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    slip_url TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_payment_booking FOREIGN KEY (booking_id) REFERENCES booking(booking_id),
+    CONSTRAINT fk_payment_user FOREIGN KEY (recorded_by) REFERENCES "user"(user_id)
+);
+
+-- 3.13 Verified Tour Reviews
+DROP TABLE IF EXISTS review CASCADE;
+CREATE TABLE review (
+    review_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    booking_id INTEGER NOT NULL UNIQUE,
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    driver_name VARCHAR(100),
+    title VARCHAR(150),
+    feedback TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_review_user FOREIGN KEY (user_id) REFERENCES "user"(user_id),
+    CONSTRAINT fk_review_booking FOREIGN KEY (booking_id) REFERENCES booking(booking_id)
+);
+
+-- 3.14 Review Photo Attachments
+DROP TABLE IF EXISTS review_image CASCADE;
+CREATE TABLE review_image (
+    image_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    review_id INTEGER NOT NULL,
+    image_url VARCHAR(255) NOT NULL,
+    CONSTRAINT fk_review_image_review FOREIGN KEY (review_id) REFERENCES review(review_id)
+);
+
+-- 3.15 Customer Inquiries & Messages
+DROP TABLE IF EXISTS contact_inquiry CASCADE;
+CREATE TABLE contact_inquiry (
+    inquiry_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sender_name VARCHAR(100) NOT NULL,
+    sender_email VARCHAR(100) NOT NULL,
+    sender_phone VARCHAR(20),
+    subject VARCHAR(100),
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    status inquiry_status_type NOT NULL DEFAULT 'new',
+    submitted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3.16 Contact Inquiries Thread Replies
+DROP TABLE IF EXISTS contact_reply CASCADE;
+CREATE TABLE contact_reply (
+    reply_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    inquiry_id INTEGER NOT NULL,
+    sender_role sender_role_type NOT NULL,
+    sender_name VARCHAR(100) NOT NULL,
+    message TEXT NOT NULL,
+    sent_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_reply_inquiry FOREIGN KEY (inquiry_id) REFERENCES contact_inquiry(inquiry_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+-- ============================================================================
+-- 4. DATA INTEGRITY CONSTRAINTS & ALTERATIONS
+-- ============================================================================
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_booking_dates_valid') THEN
+        ALTER TABLE booking ADD CONSTRAINT chk_booking_dates_valid CHECK (end_date >= start_date);
+    END IF;
+END $$;
+
+-- ============================================================================
+-- 5. INDEXES (SPATIAL, B-TREE, COMPOSITE & PARTIAL)
+-- ============================================================================
+
+-- 5.1 PostGIS Spatial GIST Indexes
+CREATE INDEX IF NOT EXISTS idx_place_geom ON place USING GIST (geom);
+CREATE INDEX IF NOT EXISTS idx_package_place_geom ON package_place USING GIST (geom);
 CREATE INDEX IF NOT EXISTS idx_booking_pickup_geom ON booking USING GIST (pickup_geom);
 CREATE INDEX IF NOT EXISTS idx_booking_dropoff_geom ON booking USING GIST (dropoff_geom);
 
--- PostGIS synchronization trigger function for booking
-DROP FUNCTION IF EXISTS set_booking_geoms() CASCADE;
+-- 5.2 Unique Indexes
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_email_unique_lower ON "user" (LOWER(email));
+
+-- 5.3 Foreign Key & Performance B-Tree Indexes
+CREATE INDEX IF NOT EXISTS idx_booking_user_id ON booking(user_id);
+CREATE INDEX IF NOT EXISTS idx_booking_vehicle_id ON booking(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_booking_package_pkg_id ON booking_package(package_id);
+CREATE INDEX IF NOT EXISTS idx_booking_package_booking_id ON booking_package(booking_id);
+CREATE INDEX IF NOT EXISTS idx_booking_status_hist_booking_id ON booking_status_history(booking_id);
+
+CREATE INDEX IF NOT EXISTS idx_package_place_pkg_id ON package_place(package_id);
+CREATE INDEX IF NOT EXISTS idx_package_place_place_id ON package_place(place_id);
+CREATE INDEX IF NOT EXISTS idx_place_activity_place_id ON place_activity(place_id);
+CREATE INDEX IF NOT EXISTS idx_place_activity_act_id ON place_activity(activity_id);
+
+CREATE INDEX IF NOT EXISTS idx_payment_booking_id ON payment(booking_id);
+CREATE INDEX IF NOT EXISTS idx_payment_recorded_by ON payment(recorded_by);
+
+CREATE INDEX IF NOT EXISTS idx_review_rating ON review (rating);
+CREATE INDEX IF NOT EXISTS idx_review_created_at ON review (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_review_image_review_id ON review_image (review_id);
+CREATE INDEX IF NOT EXISTS idx_review_user_id ON review (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_contact_reply_inquiry_id ON contact_reply(inquiry_id);
+CREATE INDEX IF NOT EXISTS idx_contact_reply_thread ON contact_reply(inquiry_id, sent_at ASC);
+
+-- 5.4 Partial & Filtered Indexes
+CREATE INDEX IF NOT EXISTS idx_booking_pending ON booking(booking_status) WHERE booking_status = 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_payment_approved ON payment(booking_id, amount) WHERE status = 'APPROVED';
+
+-- ============================================================================
+-- 6. TRIGGER FUNCTIONS & TRIGGERS
+-- ============================================================================
+
+-- 6.1 User updated_at Timestamp Synchronization
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_user_updated_at ON "user" CASCADE;
+CREATE TRIGGER trg_user_updated_at
+BEFORE UPDATE ON "user"
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- 6.2 Place Coordinates & PostGIS Point Synchronization
+CREATE OR REPLACE FUNCTION set_place_geom()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        -- On INSERT: if coordinates are provided and geom is omitted, generate geom
+        IF NEW.geom IS NULL AND NEW.longitude IS NOT NULL AND NEW.latitude IS NOT NULL THEN
+            NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
+        -- On INSERT: if geom is provided and coordinates are omitted, extract coordinates
+        ELSIF NEW.geom IS NOT NULL AND (NEW.longitude IS NULL OR NEW.latitude IS NULL) THEN
+            NEW.longitude := ST_X(NEW.geom);
+            NEW.latitude  := ST_Y(NEW.geom);
+        END IF;
+
+    ELSIF TG_OP = 'UPDATE' THEN
+        -- On UPDATE: if coordinates changed, recompute geom
+        IF NEW.longitude IS DISTINCT FROM OLD.longitude OR NEW.latitude IS DISTINCT FROM OLD.latitude THEN
+            IF NEW.longitude IS NOT NULL AND NEW.latitude IS NOT NULL THEN
+                NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
+            ELSE
+                NEW.geom := NULL;
+            END IF;
+        -- On UPDATE: if geom changed directly, update coordinates
+        ELSIF NEW.geom IS DISTINCT FROM OLD.geom THEN
+            IF NEW.geom IS NOT NULL THEN
+                NEW.longitude := ST_X(NEW.geom);
+                NEW.latitude  := ST_Y(NEW.geom);
+            ELSE
+                NEW.longitude := NULL;
+                NEW.latitude  := NULL;
+            END IF;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_place_geom ON place CASCADE;
+CREATE TRIGGER trg_place_geom
+BEFORE INSERT OR UPDATE ON place
+FOR EACH ROW
+EXECUTE FUNCTION set_place_geom();
+
+-- 6.3 Package Place Coordinates & PostGIS Point Synchronization
+CREATE OR REPLACE FUNCTION set_package_place_geom()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+        IF NEW.longitude IS NOT NULL AND NEW.latitude IS NOT NULL THEN
+            NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
+        ELSE
+            NEW.geom := NULL;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_package_place_geom ON package_place CASCADE;
+CREATE TRIGGER trg_package_place_geom
+BEFORE INSERT OR UPDATE ON package_place
+FOR EACH ROW
+EXECUTE FUNCTION set_package_place_geom();
+
+-- 6.4 Booking Pickup/Dropoff PostGIS Coordinates Synchronization
 CREATE OR REPLACE FUNCTION set_booking_geoms()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -379,59 +510,71 @@ BEFORE INSERT OR UPDATE ON booking
 FOR EACH ROW
 EXECUTE FUNCTION set_booking_geoms();
 
-DROP TABLE IF EXISTS booking_package CASCADE;
-CREATE TABLE booking_package (
-    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    booking_id INTEGER NOT NULL UNIQUE,
-    package_id INTEGER NOT NULL,
-    CONSTRAINT fk_booking_package_booking FOREIGN KEY (booking_id) REFERENCES booking(booking_id),
-    CONSTRAINT fk_booking_package_package FOREIGN KEY (package_id) REFERENCES package(package_id)
-);
+-- 6.5 Booking Milestone Timestamps Transition
+CREATE OR REPLACE FUNCTION set_booking_milestone_timestamps()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.booking_status IS DISTINCT FROM NEW.booking_status THEN
+        IF NEW.booking_status = 'QUOTED' AND NEW.quoted_at IS NULL THEN
+            NEW.quoted_at := CURRENT_TIMESTAMP;
+        ELSIF NEW.booking_status = 'CONFIRMED' AND NEW.confirmed_at IS NULL THEN
+            NEW.confirmed_at := CURRENT_TIMESTAMP;
+        ELSIF NEW.booking_status = 'TOUR_STARTED' AND NEW.tour_started_at IS NULL THEN
+            NEW.tour_started_at := CURRENT_TIMESTAMP;
+        ELSIF NEW.booking_status = 'COMPLETED' AND NEW.completed_at IS NULL THEN
+            NEW.completed_at := CURRENT_TIMESTAMP;
+        ELSIF NEW.booking_status = 'CLOSED' AND NEW.closed_at IS NULL THEN
+            NEW.closed_at := CURRENT_TIMESTAMP;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-DROP TABLE IF EXISTS payment CASCADE;
-CREATE TABLE payment (
-    payment_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    booking_id INTEGER NOT NULL,
-    installment VARCHAR(20) NOT NULL DEFAULT 'FULL',
-    amount NUMERIC(10,2) NOT NULL,
-    payment_method payment_method_type NOT NULL,
-    received_date DATE,
-    recorded_by INTEGER,
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    slip_url TEXT,
-    notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_payment_booking FOREIGN KEY (booking_id) REFERENCES booking(booking_id),
-    CONSTRAINT fk_payment_user FOREIGN KEY (recorded_by) REFERENCES "user"(user_id)
-);
+DROP TRIGGER IF EXISTS trg_booking_milestones ON booking CASCADE;
+CREATE TRIGGER trg_booking_milestones
+BEFORE UPDATE OF booking_status ON booking
+FOR EACH ROW EXECUTE FUNCTION set_booking_milestone_timestamps();
 
--- =========================================================
--- Reviews
--- =========================================================
-DROP TABLE IF EXISTS review CASCADE;
-CREATE TABLE review (
-    review_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    booking_id INTEGER NOT NULL UNIQUE,
-    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-    driver_name VARCHAR(100),
-    title VARCHAR(150),
-    feedback TEXT,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_review_user FOREIGN KEY (user_id) REFERENCES "user"(user_id),
-    CONSTRAINT fk_review_booking FOREIGN KEY (booking_id) REFERENCES booking(booking_id)
-);
+-- 6.6 Booking Status Change History Audit Logger
+CREATE OR REPLACE FUNCTION log_booking_status_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.booking_status IS DISTINCT FROM NEW.booking_status THEN
+        INSERT INTO booking_status_history (booking_id, old_status, new_status, admin_note)
+        VALUES (NEW.booking_id, OLD.booking_status, NEW.booking_status, NEW.admin_note);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-DROP TABLE IF EXISTS review_image CASCADE;
-CREATE TABLE review_image (
-    image_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    review_id INTEGER NOT NULL,
-    image_url VARCHAR(255) NOT NULL,
-    CONSTRAINT fk_review_image_review FOREIGN KEY (review_id) REFERENCES review(review_id)
-);
+DROP TRIGGER IF EXISTS trg_booking_status_history ON booking CASCADE;
+CREATE TRIGGER trg_booking_status_history
+AFTER UPDATE OF booking_status ON booking
+FOR EACH ROW EXECUTE FUNCTION log_booking_status_change();
 
-DROP VIEW IF EXISTS review_star_summary CASCADE;
-CREATE VIEW review_star_summary AS
+-- 6.7 Inquiry Status Update on Admin Reply
+CREATE OR REPLACE FUNCTION sync_inquiry_on_reply()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE contact_inquiry
+    SET status = 'replied', is_read = TRUE
+    WHERE inquiry_id = NEW.inquiry_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_inquiry_on_reply ON contact_reply CASCADE;
+CREATE TRIGGER trg_inquiry_on_reply
+AFTER INSERT ON contact_reply
+FOR EACH ROW EXECUTE FUNCTION sync_inquiry_on_reply();
+
+-- ============================================================================
+-- 7. DATABASE VIEWS & MATERIALIZED VIEWS
+-- ============================================================================
+
+-- 7.1 Review Star Rating Aggregation View
+CREATE OR REPLACE VIEW review_star_summary AS
 SELECT
     COUNT(*) AS total_reviews,
     COALESCE(SUM(rating), 0) AS rating_sum,
@@ -443,7 +586,141 @@ SELECT
     COALESCE(SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END), 0) AS one_star_reviews
 FROM review;
 
--- Table-Valued Review Filter Function
+-- 7.2 Comprehensive Booking Details Projection
+CREATE OR REPLACE VIEW v_booking_details AS
+SELECT 
+    b.booking_id,
+    b.user_id,
+    b.customer_name,
+    b.contact_platform,
+    b.contact_number,
+    b.contact_platform2,
+    b.contact_number2,
+    b.tour_type,
+    b.category_id,
+    vc.category_name,
+    b.vehicle_id,
+    v.name AS vehicle_name,
+    v.vehicle_number,
+    b.start_date,
+    b.end_date,
+    b.pickup_time,
+    b.start_location,
+    b.end_location,
+    b.pickup_lat,
+    b.pickup_lng,
+    b.dropoff_lat,
+    b.dropoff_lng,
+    b.total_days,
+    b.days_required,
+    b.luggage_10kg,
+    b.luggage_25kg,
+    b.luggage_35kg,
+    b.no_of_adults,
+    b.no_of_children,
+    b.ages_of_children,
+    b.quoted_price,
+    b.additional_charges,
+    (COALESCE(b.quoted_price, 0) + COALESCE(b.additional_charges, 0))::numeric(10,2) AS total_price,
+    b.notes,
+    b.tour_thoughts,
+    b.admin_note,
+    b.booking_date,
+    b.booking_status,
+    b.quoted_at,
+    b.confirmed_at,
+    b.tour_started_at,
+    b.completed_at,
+    b.closed_at,
+    u.email,
+    u.contact_number AS user_phone,
+    u.emergency_name,
+    u.emergency_phone,
+    u.emergency_relationship,
+    bp.package_id,
+    p.title AS package_name
+FROM booking b
+INNER JOIN "user" u ON u.user_id = b.user_id
+LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
+LEFT JOIN vehicle v ON v.vehicle_id = b.vehicle_id
+LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
+LEFT JOIN package p ON p.package_id = bp.package_id;
+
+-- 7.3 Booking Financial Summary Projection
+CREATE OR REPLACE VIEW v_booking_financial_summary AS
+SELECT 
+    b.booking_id,
+    b.user_id,
+    b.booking_status,
+    COALESCE(b.quoted_price, 0)::numeric(10,2) AS quoted_price,
+    COALESCE(b.additional_charges, 0)::numeric(10,2) AS additional_charges,
+    (COALESCE(b.quoted_price, 0) + COALESCE(b.additional_charges, 0))::numeric(10,2) AS total_price,
+    COALESCE(p.total_paid, 0)::numeric(10,2) AS total_paid,
+    GREATEST(0, (COALESCE(b.quoted_price, 0) + COALESCE(b.additional_charges, 0)) - COALESCE(p.total_paid, 0))::numeric(10,2) AS outstanding_balance,
+    CASE 
+        WHEN COALESCE(p.total_paid, 0) = 0 THEN 'UNPAID'
+        WHEN COALESCE(p.total_paid, 0) >= (COALESCE(b.quoted_price, 0) + COALESCE(b.additional_charges, 0)) THEN 'PAID'
+        ELSE 'PARTIAL'
+    END AS payment_status
+FROM booking b
+LEFT JOIN (
+    SELECT booking_id, SUM(amount) AS total_paid
+    FROM payment
+    WHERE status = 'APPROVED'
+    GROUP BY booking_id
+) p ON p.booking_id = b.booking_id;
+
+-- 7.4 Package Catalog with JSON Aggregated Destinations
+CREATE OR REPLACE VIEW v_package_catalog AS
+SELECT 
+    p.package_id,
+    p.title,
+    p.type,
+    p.days,
+    p.description,
+    p.image_url,
+    p.availability_status,
+    COALESCE(
+        jsonb_agg(
+            jsonb_build_object(
+                'place_id', pl.place_id,
+                'name', pl.place_name,
+                'image', pl.image_url,
+                'dayNumber', pp.day_number,
+                'latitude', COALESCE(pp.latitude, pl.latitude),
+                'longitude', COALESCE(pp.longitude, pl.longitude)
+            ) ORDER BY pp.day_number ASC
+        ) FILTER (WHERE pl.place_id IS NOT NULL),
+        '[]'::jsonb
+    ) AS destinations,
+    COUNT(pp.id)::integer AS total_places
+FROM package p
+LEFT JOIN package_place pp ON pp.package_id = p.package_id
+LEFT JOIN place pl ON pl.place_id = pp.place_id
+GROUP BY p.package_id;
+
+-- 7.5 Materialized View for High-Performance Monthly Reporting
+DROP MATERIALIZED VIEW IF EXISTS mv_monthly_financial_metrics CASCADE;
+
+CREATE MATERIALIZED VIEW mv_monthly_financial_metrics AS
+SELECT 
+    EXTRACT(YEAR FROM received_date)::integer AS year,
+    EXTRACT(MONTH FROM received_date)::integer AS month,
+    COUNT(payment_id)::integer AS transaction_count,
+    COALESCE(SUM(amount), 0)::numeric(12, 2) AS total_earnings
+FROM payment
+WHERE status = 'APPROVED'
+GROUP BY EXTRACT(YEAR FROM received_date), EXTRACT(MONTH FROM received_date)
+ORDER BY year DESC, month ASC;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_financial_year_month 
+ON mv_monthly_financial_metrics(year, month);
+
+-- ============================================================================
+-- 8. STORED PROCEDURES & BUSINESS LOGIC FUNCTIONS
+-- ============================================================================
+
+-- 8.1 Table-Valued Filtered Reviews Query Function
 CREATE OR REPLACE FUNCTION fn_get_filtered_reviews(
     p_stars      INTEGER DEFAULT NULL,
     p_tour_type  VARCHAR DEFAULT NULL,
@@ -519,187 +796,7 @@ BEGIN
 END;
 $$;
 
--- Supporting B-Tree Indexes
-CREATE INDEX IF NOT EXISTS idx_review_rating ON review (rating);
-CREATE INDEX IF NOT EXISTS idx_review_created_at ON review (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_review_image_review_id ON review_image (review_id);
-CREATE INDEX IF NOT EXISTS idx_review_user_id ON review (user_id);
-
--- =========================================================
--- Support & Inquiries
--- =========================================================
-DROP TABLE IF EXISTS contact_inquiry CASCADE;
-CREATE TABLE contact_inquiry (
-    inquiry_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    sender_name VARCHAR(100) NOT NULL,
-    sender_email VARCHAR(100) NOT NULL,
-    sender_phone VARCHAR(20),
-    subject VARCHAR(100),
-    message TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT FALSE,
-    status inquiry_status_type NOT NULL DEFAULT 'new',
-    submitted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-DROP TABLE IF EXISTS contact_reply CASCADE;
-CREATE TABLE contact_reply (
-    reply_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    inquiry_id INTEGER NOT NULL,
-    sender_role sender_role_type NOT NULL,
-    sender_name VARCHAR(100) NOT NULL,
-    message TEXT NOT NULL,
-    sent_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_reply_inquiry FOREIGN KEY (inquiry_id) REFERENCES contact_inquiry(inquiry_id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
-);
-
--- =========================================================
--- High-Performance B-Tree, Composite & Partial Indexes
--- =========================================================
-CREATE INDEX IF NOT EXISTS idx_payment_booking_id ON payment(booking_id);
-CREATE INDEX IF NOT EXISTS idx_payment_recorded_by ON payment(recorded_by);
-CREATE INDEX IF NOT EXISTS idx_booking_package_pkg_id ON booking_package(package_id);
-CREATE INDEX IF NOT EXISTS idx_booking_package_booking_id ON booking_package(booking_id);
-CREATE INDEX IF NOT EXISTS idx_package_place_pkg_id ON package_place(package_id);
-CREATE INDEX IF NOT EXISTS idx_package_place_place_id ON package_place(place_id);
-CREATE INDEX IF NOT EXISTS idx_place_activity_place_id ON place_activity(place_id);
-CREATE INDEX IF NOT EXISTS idx_place_activity_act_id ON place_activity(activity_id);
-CREATE INDEX IF NOT EXISTS idx_contact_reply_inquiry_id ON contact_reply(inquiry_id);
-CREATE INDEX IF NOT EXISTS idx_booking_user_id ON booking(user_id);
-CREATE INDEX IF NOT EXISTS idx_booking_vehicle_id ON booking(vehicle_id);
-
-CREATE INDEX IF NOT EXISTS idx_contact_reply_thread ON contact_reply(inquiry_id, sent_at ASC);
-
-CREATE INDEX IF NOT EXISTS idx_booking_pending ON booking(booking_status) WHERE booking_status = 'PENDING';
-CREATE INDEX IF NOT EXISTS idx_payment_approved ON payment(booking_id, amount) WHERE status = 'APPROVED';
-
--- Data Integrity Constraints
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_booking_dates_valid') THEN
-        ALTER TABLE booking ADD CONSTRAINT chk_booking_dates_valid CHECK (end_date >= start_date);
-    END IF;
-END $$;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_email_unique_lower ON "user" (LOWER(email));
-
--- =========================================================
--- Canonical Read Projections (Views)
--- =========================================================
-CREATE OR REPLACE VIEW v_booking_details AS
-SELECT 
-    b.booking_id,
-    b.user_id,
-    b.customer_name,
-    b.contact_platform,
-    b.contact_number,
-    b.contact_platform2,
-    b.contact_number2,
-    b.tour_type,
-    b.category_id,
-    vc.category_name,
-    b.vehicle_id,
-    v.name AS vehicle_name,
-    v.vehicle_number,
-    b.start_date,
-    b.end_date,
-    b.pickup_time,
-    b.start_location,
-    b.end_location,
-    b.pickup_lat,
-    b.pickup_lng,
-    b.dropoff_lat,
-    b.dropoff_lng,
-    b.total_days,
-    b.days_required,
-    b.luggage_10kg,
-    b.luggage_25kg,
-    b.luggage_35kg,
-    b.no_of_adults,
-    b.no_of_children,
-    b.ages_of_children,
-    b.quoted_price,
-    b.additional_charges,
-    (COALESCE(b.quoted_price, 0) + COALESCE(b.additional_charges, 0))::numeric(10,2) AS total_price,
-    b.notes,
-    b.tour_thoughts,
-    b.admin_note,
-    b.booking_date,
-    b.booking_status,
-    b.quoted_at,
-    b.confirmed_at,
-    b.tour_started_at,
-    b.completed_at,
-    b.closed_at,
-    u.email,
-    u.contact_number AS user_phone,
-    u.emergency_name,
-    u.emergency_phone,
-    u.emergency_relationship,
-    bp.package_id,
-    p.title AS package_name
-FROM booking b
-INNER JOIN "user" u ON u.user_id = b.user_id
-LEFT JOIN vehicle_category vc ON vc.category_id = b.category_id
-LEFT JOIN vehicle v ON v.vehicle_id = b.vehicle_id
-LEFT JOIN booking_package bp ON bp.booking_id = b.booking_id
-LEFT JOIN package p ON p.package_id = bp.package_id;
-
-CREATE OR REPLACE VIEW v_booking_financial_summary AS
-SELECT 
-    b.booking_id,
-    b.user_id,
-    b.booking_status,
-    COALESCE(b.quoted_price, 0)::numeric(10,2) AS quoted_price,
-    COALESCE(b.additional_charges, 0)::numeric(10,2) AS additional_charges,
-    (COALESCE(b.quoted_price, 0) + COALESCE(b.additional_charges, 0))::numeric(10,2) AS total_price,
-    COALESCE(p.total_paid, 0)::numeric(10,2) AS total_paid,
-    GREATEST(0, (COALESCE(b.quoted_price, 0) + COALESCE(b.additional_charges, 0)) - COALESCE(p.total_paid, 0))::numeric(10,2) AS outstanding_balance,
-    CASE 
-        WHEN COALESCE(p.total_paid, 0) = 0 THEN 'UNPAID'
-        WHEN COALESCE(p.total_paid, 0) >= (COALESCE(b.quoted_price, 0) + COALESCE(b.additional_charges, 0)) THEN 'PAID'
-        ELSE 'PARTIAL'
-    END AS payment_status
-FROM booking b
-LEFT JOIN (
-    SELECT booking_id, SUM(amount) AS total_paid
-    FROM payment
-    WHERE status = 'APPROVED'
-    GROUP BY booking_id
-) p ON p.booking_id = b.booking_id;
-
-CREATE OR REPLACE VIEW v_package_catalog AS
-SELECT 
-    p.package_id,
-    p.title,
-    p.type,
-    p.days,
-    p.description,
-    p.image_url,
-    p.availability_status,
-    COALESCE(
-        jsonb_agg(
-            jsonb_build_object(
-                'place_id', pl.place_id,
-                'name', pl.place_name,
-                'image', pl.image_url,
-                'dayNumber', pp.day_number,
-                'latitude', COALESCE(pp.latitude, pl.latitude),
-                'longitude', COALESCE(pp.longitude, pl.longitude)
-            ) ORDER BY pp.day_number ASC
-        ) FILTER (WHERE pl.place_id IS NOT NULL),
-        '[]'::jsonb
-    ) AS destinations,
-    COUNT(pp.id)::integer AS total_places
-FROM package p
-LEFT JOIN package_place pp ON pp.package_id = p.package_id
-LEFT JOIN place pl ON pl.place_id = pp.place_id
-GROUP BY p.package_id;
-
--- =========================================================
--- Intelligent Functions
--- =========================================================
+-- 8.2 Available Fleet Vehicles Search Function
 DROP FUNCTION IF EXISTS fn_get_available_vehicles(INTEGER, DATE, DATE);
 CREATE OR REPLACE FUNCTION fn_get_available_vehicles(
     p_category_id INTEGER,
@@ -743,6 +840,7 @@ BEGIN
 END;
 $$;
 
+-- 8.3 PostGIS Geospatial Nearby Places Search Function
 CREATE OR REPLACE FUNCTION fn_get_places_nearby(
     p_lat NUMERIC,
     p_lng NUMERIC,
@@ -773,106 +871,7 @@ BEGIN
 END;
 $$;
 
--- =========================================================
--- Lifecycle & Audit Triggers & History Table
--- =========================================================
-CREATE OR REPLACE FUNCTION set_booking_milestone_timestamps()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF OLD.booking_status IS DISTINCT FROM NEW.booking_status THEN
-        IF NEW.booking_status = 'QUOTED' AND NEW.quoted_at IS NULL THEN
-            NEW.quoted_at := CURRENT_TIMESTAMP;
-        ELSIF NEW.booking_status = 'CONFIRMED' AND NEW.confirmed_at IS NULL THEN
-            NEW.confirmed_at := CURRENT_TIMESTAMP;
-        ELSIF NEW.booking_status = 'TOUR_STARTED' AND NEW.tour_started_at IS NULL THEN
-            NEW.tour_started_at := CURRENT_TIMESTAMP;
-        ELSIF NEW.booking_status = 'COMPLETED' AND NEW.completed_at IS NULL THEN
-            NEW.completed_at := CURRENT_TIMESTAMP;
-        ELSIF NEW.booking_status = 'CLOSED' AND NEW.closed_at IS NULL THEN
-            NEW.closed_at := CURRENT_TIMESTAMP;
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_booking_milestones ON booking;
-CREATE TRIGGER trg_booking_milestones
-BEFORE UPDATE OF booking_status ON booking
-FOR EACH ROW EXECUTE FUNCTION set_booking_milestone_timestamps();
-
-CREATE OR REPLACE FUNCTION sync_inquiry_on_reply()
-RETURNS TRIGGER AS $$
-BEGIN
-    UPDATE contact_inquiry
-    SET status = 'replied', is_read = TRUE
-    WHERE inquiry_id = NEW.inquiry_id;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_inquiry_on_reply ON contact_reply;
-CREATE TRIGGER trg_inquiry_on_reply
-AFTER INSERT ON contact_reply
-FOR EACH ROW EXECUTE FUNCTION sync_inquiry_on_reply();
-
-CREATE TABLE IF NOT EXISTS booking_status_history (
-    history_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    booking_id INTEGER NOT NULL REFERENCES booking(booking_id) ON DELETE CASCADE,
-    old_status booking_status_type,
-    new_status booking_status_type NOT NULL,
-    admin_note TEXT,
-    changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_booking_status_hist_booking_id ON booking_status_history(booking_id);
-
-CREATE OR REPLACE FUNCTION log_booking_status_change()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF OLD.booking_status IS DISTINCT FROM NEW.booking_status THEN
-        INSERT INTO booking_status_history (booking_id, old_status, new_status, admin_note)
-        VALUES (NEW.booking_id, OLD.booking_status, NEW.booking_status, NEW.admin_note);
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_booking_status_history ON booking;
-CREATE TRIGGER trg_booking_status_history
-AFTER UPDATE OF booking_status ON booking
-FOR EACH ROW EXECUTE FUNCTION log_booking_status_change();
-
-
--- =========================================================
--- Migration 008: Procedures, Materialized View & Cronjobs
--- =========================================================
-
--- =========================================================
--- 1. Materialized View for High-Performance Reporting
--- =========================================================
-
-DROP MATERIALIZED VIEW IF EXISTS mv_monthly_financial_metrics CASCADE;
-
-CREATE MATERIALIZED VIEW mv_monthly_financial_metrics AS
-SELECT 
-    EXTRACT(YEAR FROM received_date)::integer AS year,
-    EXTRACT(MONTH FROM received_date)::integer AS month,
-    COUNT(payment_id)::integer AS transaction_count,
-    COALESCE(SUM(amount), 0)::numeric(12, 2) AS total_earnings
-FROM payment
-WHERE status = 'APPROVED'
-GROUP BY EXTRACT(YEAR FROM received_date), EXTRACT(MONTH FROM received_date)
-ORDER BY year DESC, month ASC;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_financial_year_month 
-ON mv_monthly_financial_metrics(year, month);
-
--- =========================================================
--- 2. Stored Procedures & Transactional Functions
--- =========================================================
-
--- 2.1 Atomic Tour Booking & Category / User Emergency Sync
+-- 8.4 Atomic Booking Creation & Emergency Info Sync
 CREATE OR REPLACE FUNCTION sp_create_booking(
     p_user_id INTEGER,
     p_customer_name VARCHAR,
@@ -985,7 +984,7 @@ BEGIN
 END;
 $$;
 
--- 2.2 Concurrency-Safe Quoting & Vehicle Collision Prevention
+-- 8.5 Concurrency-Safe Quoting & Vehicle Collision Prevention
 CREATE OR REPLACE FUNCTION sp_set_booking_quote(
     p_booking_id INTEGER,
     p_quoted_price NUMERIC,
@@ -1050,7 +1049,7 @@ BEGIN
 END;
 $$;
 
--- 2.3 Financial Recording & Real-Time Balance Reconciler
+-- 8.6 Financial Recording & Real-Time Balance Reconciler
 CREATE OR REPLACE FUNCTION sp_record_and_reconcile_payment(
     p_booking_id INTEGER,
     p_installment VARCHAR,
@@ -1135,7 +1134,7 @@ BEGIN
 END;
 $$;
 
--- 2.4 Batch Package & Itinerary Ingestion
+-- 8.7 Batch Package & Itinerary Ingestion Procedure
 CREATE OR REPLACE FUNCTION sp_create_package_with_itinerary(
     p_title VARCHAR,
     p_type package_type,
@@ -1220,7 +1219,7 @@ BEGIN
 END;
 $$;
 
--- 2.5 Verified Tour Review Ingestion
+-- 8.8 Verified Tour Review Submission Procedure
 CREATE OR REPLACE FUNCTION sp_submit_tour_review(
     p_user_id INTEGER,
     p_booking_id INTEGER,
@@ -1277,11 +1276,11 @@ BEGIN
 END;
 $$;
 
--- =========================================================
--- 3. Maintenance & Automated State Functions (Cronjobs)
--- =========================================================
+-- ============================================================================
+-- 9. MAINTENANCE & AUTOMATED STATE FUNCTIONS (CRON JOBS)
+-- ============================================================================
 
--- 3.1 Advance Tour Lifecycle (CONFIRMED -> TOUR_STARTED -> COMPLETED)
+-- 9.1 Advance Tour Lifecycle (CONFIRMED -> TOUR_STARTED -> COMPLETED)
 CREATE OR REPLACE FUNCTION fn_advance_tour_lifecycle()
 RETURNS TABLE (
     started_count INTEGER,
@@ -1317,7 +1316,7 @@ BEGIN
 END;
 $$;
 
--- 3.2 Expire Stale Quotes & Free Held Inventory
+-- 9.2 Expire Stale Quotes & Free Held Inventory
 CREATE OR REPLACE FUNCTION fn_expire_stale_quotes(
     p_expiry_days INTEGER DEFAULT 7
 )
@@ -1344,7 +1343,7 @@ BEGIN
 END;
 $$;
 
--- 3.3 Audit Pending Payment Slips
+-- 9.3 Audit Pending Payment Slips
 CREATE OR REPLACE FUNCTION fn_audit_pending_payments(
     p_threshold_hours INTEGER DEFAULT 48
 )
@@ -1375,7 +1374,7 @@ BEGIN
 END;
 $$;
 
--- 3.4 Concurrently Refresh Reporting Materialized Views
+-- 9.4 Concurrently Refresh Reporting Materialized Views
 CREATE OR REPLACE FUNCTION fn_refresh_report_materialized_views()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1385,7 +1384,7 @@ BEGIN
 END;
 $$;
 
--- 3.5 Database Health & Statistics Maintenance
+-- 9.5 Database Health & Statistics Maintenance
 CREATE OR REPLACE FUNCTION fn_run_db_maintenance()
 RETURNS TEXT
 LANGUAGE plpgsql

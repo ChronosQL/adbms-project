@@ -161,7 +161,7 @@ function BookingRow({ booking: b, cols, t, isLast, onView }) {
       {/* Quoted */}
       <div style={cellStyle(cols[7].flex)}>
         <p style={{ margin: 0, fontSize: 14, fontWeight: 800, fontFamily: "monospace", color: b.quotedPrice ? STATE.info : t.textSecondary }}>
-          {b.quotedPrice ? `$${b.quotedPrice}` : "—"}
+          {b.quotedPrice ? `LKR ${Number(b.quotedPrice).toLocaleString('en-LK')}` : "—"}
         </p>
       </div>
 

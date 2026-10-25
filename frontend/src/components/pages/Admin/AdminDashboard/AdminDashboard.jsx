@@ -251,7 +251,7 @@ export default function AdminDashboard() {
                         <td style={{ fontFamily: FONT.body, color: t.textSecondary }} className="px-5 py-3.5 text-[13px] max-w-[200px] truncate">{tourLabel}</td>
                         <td style={{ fontFamily: FONT.body, color: t.textSecondary }} className="px-5 py-3.5 text-[12px] whitespace-nowrap">{b.startDate || "—"}</td>
                         <td style={{ fontFamily: FONT.body, color: t.textPrimary }} className="px-5 py-3.5 text-[13px] font-bold font-mono">
-                          {b.quotedPrice ? `$${b.quotedPrice}` : "—"}
+                          {b.quotedPrice ? `LKR ${Number(b.quotedPrice).toLocaleString('en-LK')}` : "—"}
                         </td>
                         <td className="px-5 py-3.5"><StatusChip status={b.status} /></td>
                       </tr>

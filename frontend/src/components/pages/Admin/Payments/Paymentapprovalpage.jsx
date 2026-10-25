@@ -265,6 +265,10 @@ export default function PaymentApprovalsPage() {
       setFormError("Please enter a valid positive amount.");
       return;
     }
+    if (Math.round(amount * 100) > Math.round(payableBooking * 100)) {
+      setFormError(`Warning: Entered amount (LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}) exceeds the remaining payable balance of LKR ${payableBooking.toLocaleString('en-LK', { minimumFractionDigits: 2 })}.`);
+      return;
+    }
     if (!form.received_date) {
       setFormError("Please select the date received.");
       return;
@@ -710,7 +714,7 @@ export default function PaymentApprovalsPage() {
                           <BookingStatusBadge status={b.status} />
                           {b.quotedPrice && (
                             <span style={{ fontSize: 12, fontWeight: 700, color: t.textPrimary }}>
-                              ${b.quotedPrice}
+                              LKR {Number(b.quotedPrice).toLocaleString('en-LK')}
                             </span>
                           )}
                         </div>

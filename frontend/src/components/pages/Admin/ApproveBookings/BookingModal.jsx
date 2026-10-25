@@ -469,7 +469,7 @@ export default function BookingModal({ booking, dark, onClose, onSetQuote, onUpd
           {booking.status === "ACCEPTED" && (
             <div style={{ background: dark ? "rgba(16,185,129,0.07)" : "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 16, padding: 20, marginBottom: 16 }}>
               <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 800, color: "#2F9E44" }}>
-                ✅ Customer accepted — ${booking.quotedPrice}
+                ✅ Customer accepted — LKR {Number(booking.quotedPrice).toLocaleString('en-LK')}
               </p>
               <p style={{ margin: "0 0 14px", fontSize: 12, color: ts }}>
                 Confirm to lock this booking.{booking.assignedVehicle ? ` Vehicle: ${booking.assignedVehicle.name} (${booking.assignedVehicle.plateNumber})` : ""}
