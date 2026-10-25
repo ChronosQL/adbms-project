@@ -9,6 +9,7 @@
     "seed:admin": "node db/seedAdmin.js",
     "test:schema": "node --test tests/schema_regression.test.js",
     "test:pagination": "node --env-file=.env --test tests/pagination.test.js",
+    "test:cron": "node --env-file=.env --test tests/cron_verification.test.js",
     "test": "node --env-file=.env --test tests/*.test.js"
   },
   "keywords": [
