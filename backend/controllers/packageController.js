@@ -1,73 +1,32 @@
 const db = require('../db/connection');
 const cloudinary = require('cloudinary').v2;
+const { parsePagination } = require('../utils/paginate');
 
-const PACKAGE_TYPE_LABEL_TO_ENUM = {
-  'Beach Side': 'BEACH SIDE',
-  'Hill Country': 'HILL COUNTRY',
-  'Safari': 'SAFARI',
-  'Cultural Heritage': 'CULTURAL HERITAGE',
-  'Adventure': 'ADVENTURE',
-  'Wellness & Ayurveda': 'WELLNESS & AYURVEDA',
-};
-
-const PACKAGE_TYPE_ENUM_TO_LABEL = Object.entries(PACKAGE_TYPE_LABEL_TO_ENUM)
-  .reduce((acc, [label, enumValue]) => {
-    acc[enumValue] = label;
-    return acc;
-  }, {});
-
-const toPackageTypeEnum = (value) => {
-  if (value == null) return null;
-  const raw = String(value).trim();
-  if (PACKAGE_TYPE_LABEL_TO_ENUM[raw]) return PACKAGE_TYPE_LABEL_TO_ENUM[raw];
-
-  const normalized = raw.toUpperCase().replace(/\s+/g, ' ');
-  return PACKAGE_TYPE_ENUM_TO_LABEL[normalized] ? normalized : null;
-};
-
-const toPackageTypeLabel = (value) => {
-  if (value == null) return null;
-  const normalized = String(value).trim().toUpperCase().replace(/\s+/g, ' ');
-  return PACKAGE_TYPE_ENUM_TO_LABEL[normalized] || value;
-};
-
-const toPackageDaysLabel = (value) => {
-  if (value == null) return null;
-  const normalized = String(value).trim().toUpperCase();
-  if (normalized.endsWith('DAYS')) return normalized;
-  const number = Number(value);
-  if (Number.isNaN(number) || number <= 0) return null;
-  return `${number} DAYS`;
-};
-
-const toPackageDaysNumber = (value) => {
-  if (value == null) return null;
-  const match = String(value).match(/(\d+)/);
-  return match ? Number(match[1]) : Number(value) || null;
-};
-
-const normalizeAvailabilityStatus = (value) => {
-  const normalized = String(value || '').trim().toUpperCase();
-  return normalized === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'AVAILABLE';
-};
-
-const buildAvailabilityPayload = (status) => ({
-  status: normalizeAvailabilityStatus(status),
-  isAvailable: normalizeAvailabilityStatus(status) !== 'UNAVAILABLE',
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const extractAvailabilityStatus = (body = {}, defaultStatus = null) => {
-  const hasAvailabilityField = ['availabilityStatus', 'status', 'packageStatus', 'availability']
-    .some((key) => Object.prototype.hasOwnProperty.call(body, key));
+const {
+  PACKAGE_TYPE_LABEL_TO_ENUM,
+  PACKAGE_TYPE_ENUM_TO_LABEL,
+  toPackageTypeEnum,
+  toPackageTypeLabel,
+  toPackageDaysLabel,
+  toPackageDaysNumber,
+  normalizeAvailabilityStatus,
+  buildAvailabilityPayload,
+  extractAvailabilityStatus,
+  parseDestinations,
+  extractPackagePayload,
+  mapAdminPackage,
+  mapPublicPackage,
+  mapRelatedPackage,
+  mapPackagePlace,
+} = require('../dto/packageDto');
 
-  if (!hasAvailabilityField) {
-    return defaultStatus == null ? null : normalizeAvailabilityStatus(defaultStatus);
-  }
-
-  return normalizeAvailabilityStatus(body.availabilityStatus || body.status || body.packageStatus || body.availability);
-};
-
-const uploadBufferToCloudinary = (file, folder) => new Promise((resolve) => {
+const uploadBufferToCloudinary = (file, folder) => new Promise((resolve, reject) => {
   if (!file) {
     console.debug(`[Cloudinary] No file provided for folder: ${folder}`);
     return resolve(null);
@@ -75,14 +34,12 @@ const uploadBufferToCloudinary = (file, folder) => new Promise((resolve) => {
 
   const existingUrl = file.path || file.url || file.secure_url || file.location || file.filename || null;
   if (!file.buffer) {
-    console.debug(`[Cloudinary] File has no buffer, using existing URL: ${existingUrl}`);
-    return resolve(existingUrl);
+    return existingUrl ? resolve(existingUrl) : reject(new Error('The selected file could not be read.'));
   }
 
   const hasCloudinaryConfig = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
   if (!hasCloudinaryConfig) {
-    console.warn(`[Cloudinary] Config missing (CLOUD_NAME, API_KEY, API_SECRET). Skipping upload for ${folder}.`);
-    return resolve(null);
+    return reject(new Error('Image upload is unavailable because file storage is not configured.'));
   }
 
   console.debug(`[Cloudinary] Starting upload to folder: ${folder}, file size: ${file.buffer.length} bytes, originalname: ${file.originalname}`);
@@ -97,7 +54,7 @@ const uploadBufferToCloudinary = (file, folder) => new Promise((resolve) => {
     (error, result) => {
       if (error) {
         console.error(`[Cloudinary] Upload failed for ${folder}:`, error.message || error);
-        return resolve(null);
+        return reject(new Error('Image upload failed. Please try again.'));
       }
       const url = result?.secure_url || result?.url || result?.path || null;
       console.debug(`[Cloudinary] Upload successful for ${folder}: ${url}`);
@@ -107,7 +64,7 @@ const uploadBufferToCloudinary = (file, folder) => new Promise((resolve) => {
 
   uploadStream.on('error', (err) => {
     console.error(`[Cloudinary] Stream error for ${folder}:`, err.message || err);
-    resolve(null);
+    reject(new Error('Image upload failed. Please try again.'));
   });
 
   uploadStream.end(file.buffer);
@@ -141,71 +98,66 @@ exports.createPackage = async (req, res) => {
     }
 
     const packageImageFile = req.files && req.files.packageImage && req.files.packageImage[0];
+    if (!packageImageFile) return res.status(400).json({ error: 'A package cover image file is required.' });
     const packageImage = await uploadBufferToCloudinary(packageImageFile, 'package_uploads');
     const destFiles = req.files && req.files.destImages ? req.files.destImages : [];
 
-    const client = await db.connect();
-    try {
-      await client.query('BEGIN');
-
-      const { rows: pkgRows } = await client.query(
-        `INSERT INTO package (title, type, days, description, image_url, availability_status)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING package_id`,
-        [title, packageType, packageDaysLabel, description || null, packageImage, availabilityStatus]
-      );
-      const packageId = pkgRows[0].package_id;
-
-      for (let i = 0; i < destinations.length; i++) {
-        const dest = destinations[i] || {};
-        const destImage = await uploadBufferToCloudinary(destFiles[i], 'package_uploads') || dest.image || null;
-
-        const { rows: placeRows } = await client.query(
-          `INSERT INTO place (place_name, image_url, description) VALUES ($1, $2, $3) RETURNING place_id`,
-          [dest.name || null, destImage, dest.description || null]
-        );
-        const placeId = placeRows[0].place_id;
-
-        const dayNumber = dest.dayNumber || (i + 1);
-        await client.query(
-          `INSERT INTO package_place (package_id, place_id, day_number) VALUES ($1, $2, $3)`,
-          [packageId, placeId, dayNumber]
-        );
-
-        const activities = Array.isArray(dest.activities) ? dest.activities : [];
-        for (const act of activities) {
-          if (!act.name) continue;
-          const { rows: actRows } = await client.query(
-            `INSERT INTO activity (activity_name, phone, description) VALUES ($1, $2, $3) RETURNING activity_id`,
-            [act.name, act.phone || null, act.description || null]
-          );
-          const activityId = actRows[0].activity_id;
-          await client.query(
-            `INSERT INTO place_activity (place_id, activity_id) VALUES ($1, $2)`,
-            [placeId, activityId]
-          );
-        }
+    const enrichedDestinations = [];
+    for (let i = 0; i < destinations.length; i++) {
+      const dest = destinations[i] || {};
+      let fileForDest = null;
+      if (dest.imageIndex !== undefined && dest.imageIndex !== null && destFiles[dest.imageIndex]) {
+        fileForDest = destFiles[dest.imageIndex];
+      } else if (destFiles.length === destinations.length) {
+        fileForDest = destFiles[i];
       }
+      const destImage = fileForDest ? await uploadBufferToCloudinary(fileForDest, 'package_uploads') : (dest.image || null);
+      const lat = (dest.latitude !== undefined && dest.latitude !== null && dest.latitude !== '')
+        ? parseFloat(dest.latitude)
+        : ((dest.lat !== undefined && dest.lat !== null && dest.lat !== '') ? parseFloat(dest.lat) : null);
+      const lng = (dest.longitude !== undefined && dest.longitude !== null && dest.longitude !== '')
+        ? parseFloat(dest.longitude)
+        : ((dest.lng !== undefined && dest.lng !== null && dest.lng !== '') ? parseFloat(dest.lng) : null);
 
-      await client.query('COMMIT');
-
-      res.status(201).json({
-        package_id: packageId,
-        title,
-        type: toPackageTypeLabel(packageType),
-        days: toPackageDaysNumber(packageDaysLabel),
-        description: description || null,
-        image_url: packageImage,
-        availability_status: availabilityStatus,
+      enrichedDestinations.push({
+        name: dest.name || null,
+        image: destImage,
+        description: dest.description || null,
+        latitude: lat,
+        longitude: lng,
+        dayNumber: dest.dayNumber || (i + 1),
+        activities: Array.isArray(dest.activities) ? dest.activities : [],
       });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
     }
+
+    // sp_create_package_with_itinerary batch inserts dest.latitude and dest.longitude into package_place and activities
+    const { rows } = await db.query(
+      `SELECT * FROM sp_create_package_with_itinerary($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+      [
+        title,
+        packageType,
+        packageDaysLabel,
+        description || null,
+        packageImage,
+        availabilityStatus,
+        JSON.stringify(enrichedDestinations),
+      ]
+    );
+
+    const packageId = rows[0].package_id;
+
+    res.status(201).json({
+      package_id: packageId,
+      title,
+      type: toPackageTypeLabel(packageType),
+      days: toPackageDaysNumber(packageDaysLabel),
+      description: description || null,
+      image_url: packageImage,
+      availability_status: availabilityStatus,
+    });
   } catch (error) {
     console.error('createPackage failed:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to create package or upload its images.' });
   }
 };
 
@@ -229,7 +181,9 @@ exports.listAdminPackages = async (req, res) => {
 
     if (packageIds.length > 0) {
       const { rows: places } = await db.query(`
-        SELECT pp.package_id, pl.place_id, pl.place_name, pl.image_url, pl.description, pp.day_number
+        SELECT pp.package_id, pl.place_id, pl.place_name, pl.image_url, pl.description, pp.day_number,
+               COALESCE(pp.latitude, pl.latitude) AS latitude,
+               COALESCE(pp.longitude, pl.longitude) AS longitude
         FROM package_place pp
         INNER JOIN place pl ON pl.place_id = pp.place_id
         WHERE pp.package_id = ANY($1)
@@ -244,29 +198,14 @@ exports.listAdminPackages = async (req, res) => {
           description: item.description,
           image: item.image_url,
           days: item.day_number,
+          latitude: item.latitude !== null && item.latitude !== undefined ? parseFloat(item.latitude) : null,
+          longitude: item.longitude !== null && item.longitude !== undefined ? parseFloat(item.longitude) : null,
         });
         return acc;
       }, {});
     }
 
-    res.json(packages.map(r => {
-      const total = (destinationsByPackage[r.package_id] || []).length;
-      const shown = Math.min(2, total);
-      const hidden = Math.max(0, total - shown);
-
-      return {
-        id: r.package_id,
-        title: r.title,
-        type: toPackageTypeLabel(r.type),
-        days: toPackageDaysNumber(r.days),
-        description: r.description,
-        image_url: r.image_url,
-        destinations: destinationsByPackage[r.package_id] || [],
-        places_count: (destinationsByPackage[r.package_id] || []).length,
-        hidden_dest_count: hidden,
-        availability: buildAvailabilityPayload(r.availability_status),
-      };
-    }));
+    res.json(packages.map((r) => mapAdminPackage(r, destinationsByPackage)));
   } catch (error) {
     console.error('listAdminPackages failed:', error);
     res.status(500).json({ error: 'Failed to load packages.' });
@@ -277,6 +216,8 @@ exports.listPublicPackages = async (req, res) => {
   try {
     const qType = req.query.type || null;
     const qDays = req.query.days || null;
+    const { page, limit, offset, buildPagination } = parsePagination(req.query, 9, 60);
+    const isPaginated = req.query.page !== undefined || req.query.limit !== undefined;
 
     const where = [];
     const params = [];
@@ -299,7 +240,7 @@ exports.listPublicPackages = async (req, res) => {
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-    const { rows: packages } = await db.query(`
+    let querySql = `
       SELECT
         p.package_id,
         p.title,
@@ -307,89 +248,48 @@ exports.listPublicPackages = async (req, res) => {
         p.days,
         p.description,
         p.image_url,
-        p.availability_status
-      FROM package p
+        p.availability_status,
+        p.destinations,
+        p.total_places,
+        COALESCE(r.avg_rating, 0) AS avg_rating,
+        COALESCE(r.reviews_count, 0) AS reviews_count,
+        COALESCE(b.bookings_count, 0) AS bookings_count,
+        COUNT(*) OVER()::integer AS total_count
+      FROM v_package_catalog p
+      LEFT JOIN (
+        SELECT bp.package_id,
+               ROUND(AVG(rv.rating), 2) AS avg_rating,
+               COUNT(rv.review_id)::integer AS reviews_count
+        FROM booking_package bp
+        JOIN review rv ON rv.booking_id = bp.booking_id
+        GROUP BY bp.package_id
+      ) r ON r.package_id = p.package_id
+      LEFT JOIN (
+        SELECT package_id, COUNT(*)::integer AS bookings_count
+        FROM booking_package
+        GROUP BY package_id
+      ) b ON b.package_id = p.package_id
       ${whereSql}
       ORDER BY p.package_id DESC
-    `, params);
+    `;
 
-    const packageIds = packages.map((p) => p.package_id);
-    let ratingsByPackage = {};
-    let bookingsByPackage = {};
-
-    if (packageIds.length > 0) {
-      const { rows: ratingRows } = await db.query(`
-        SELECT bp.package_id, AVG(r.rating) AS avg_rating, COUNT(r.review_id) AS reviews_count
-        FROM booking_package bp
-        INNER JOIN review r ON r.booking_id = bp.booking_id
-        WHERE bp.package_id = ANY($1)
-        GROUP BY bp.package_id
-      `, [packageIds]);
-
-      ratingsByPackage = ratingRows.reduce((acc, row) => {
-        acc[row.package_id] = {
-          avg_rating: row.avg_rating != null ? Number(row.avg_rating) : 0,
-          reviews_count: row.reviews_count != null ? Number(row.reviews_count) : 0,
-        };
-        return acc;
-      }, {});
-
-      const { rows: bookingRows } = await db.query(`
-        SELECT package_id, COUNT(*) AS bookings_count
-        FROM booking_package
-        WHERE package_id = ANY($1)
-        GROUP BY package_id
-      `, [packageIds]);
-
-      bookingsByPackage = bookingRows.reduce((acc, row) => {
-        acc[row.package_id] = Number(row.bookings_count) || 0;
-        return acc;
-      }, {});
+    if (isPaginated) {
+      params.push(limit, offset);
+      querySql += ` LIMIT $${params.length - 1} OFFSET $${params.length}`;
     }
 
-    let placesByPkg = {};
-    let placeCountByPkg = {};
-    if (packageIds.length > 0) {
-      const { rows: places } = await db.query(`
-        SELECT pp.package_id, pl.place_name, pl.image_url, pp.day_number
-        FROM package_place pp
-        INNER JOIN place pl ON pl.place_id = pp.place_id
-        WHERE pp.package_id = ANY($1)
-        ORDER BY pp.package_id, pp.day_number ASC
-      `, [packageIds]);
-      placeCountByPkg = places.reduce((acc, p) => {
-        acc[p.package_id] = (acc[p.package_id] || 0) + 1;
-        return acc;
-      }, {});
-      placesByPkg = places.reduce((acc, p) => {
-        acc[p.package_id] = acc[p.package_id] || [];
-        if (acc[p.package_id].length < 2) acc[p.package_id].push({ name: p.place_name, image: p.image_url, dayNumber: p.day_number });
-        return acc;
-      }, {});
+    const { rows: packages } = await db.query(querySql, params);
+    const totalCount = packages.length > 0 ? packages[0].total_count : 0;
+    const pagination = buildPagination(totalCount);
+
+    const result = packages.map(mapPublicPackage);
+
+    if (isPaginated) {
+      res.json({ packages: result, pagination });
+    } else {
+      result.pagination = pagination;
+      res.json(result);
     }
-
-    const result = packages.map(p => {
-      const shown = (placesByPkg[p.package_id] || []).length;
-      const total = placeCountByPkg[p.package_id] || 0;
-      const hidden = Math.max(0, total - shown);
-
-      return {
-        id: p.package_id,
-        title: p.title,
-        type: toPackageTypeLabel(p.type),
-        days: toPackageDaysNumber(p.days),
-        description: p.description,
-        image: p.image_url,
-        highlights: [],
-        destinations: placesByPkg[p.package_id] || [],
-        hidden_dest_count: hidden,
-        avg_rating: ratingsByPackage[p.package_id]?.avg_rating || 0,
-        reviews_count: ratingsByPackage[p.package_id]?.reviews_count || 0,
-        bookings_count: bookingsByPackage[p.package_id] || 0,
-        availability: buildAvailabilityPayload(p.availability_status),
-      };
-    });
-    res.json(result);
   } catch (error) {
     console.error('listPublicPackages failed:', error);
     res.status(500).json({ error: 'Failed to load packages.' });
@@ -416,7 +316,9 @@ exports.getPackageDetail = async (req, res) => {
     const pkgRow = rows[0];
 
     const { rows: places } = await db.query(`
-      SELECT pl.place_id, pl.place_name, pl.image_url, pl.description, pp.day_number
+      SELECT pl.place_id, pl.place_name, pl.image_url, pl.description, pp.day_number,
+             COALESCE(pp.latitude, pl.latitude) AS latitude,
+             COALESCE(pp.longitude, pl.longitude) AS longitude
       FROM package_place pp
       INNER JOIN place pl ON pl.place_id = pp.place_id
       WHERE pp.package_id = $1
@@ -448,6 +350,8 @@ exports.getPackageDetail = async (req, res) => {
       image: p.image_url,
       description: p.description,
       dayNumber: p.day_number,
+      latitude: p.latitude !== null && p.latitude !== undefined ? parseFloat(p.latitude) : null,
+      longitude: p.longitude !== null && p.longitude !== undefined ? parseFloat(p.longitude) : null,
       activities: activitiesByPlace[p.place_id] || []
     }));
 
@@ -533,19 +437,7 @@ exports.getRecommendations = async (req, res) => {
       [id, Number(limit)]
     );
 
-    const normalize = (rows) => (Array.isArray(rows) ? rows.map(r => ({
-      id: r.id,
-      title: r.title,
-      type: r.type ? toPackageTypeLabel(r.type) : null,
-      days: r.days ? toPackageDaysNumber(r.days) : null,
-      image: r.image || r.image_url || null,
-      description: r.description || null,
-      avg_rating: r.avg_rating != null ? Number(r.avg_rating) : null,
-      reviews_count: r.reviews_count != null ? Number(r.reviews_count) : undefined,
-      bookings_count: r.bookings_count != null ? Number(r.bookings_count) : undefined,
-      destinations: [],
-      availability: { status: 'AVAILABLE' },
-    })) : []);
+    const normalize = (rows) => (Array.isArray(rows) ? rows.map(mapRelatedPackage) : []);
 
     res.json({
       similarByType: normalize(similarByType.rows),
@@ -567,7 +459,8 @@ exports.updatePackage = async (req, res) => {
     const availabilityStatus = extractAvailabilityStatus(req.body);
 
     const packageImageFile = req.files && req.files.packageImage && req.files.packageImage[0];
-    const packageImage = await uploadBufferToCloudinary(packageImageFile, 'package_uploads');
+    const uploadedPackageImage = packageImageFile ? await uploadBufferToCloudinary(packageImageFile, 'package_uploads') : null;
+    const packageImage = uploadedPackageImage;
     const destFiles = req.files && req.files.destImages ? req.files.destImages : [];
 
     let destinations = [];
@@ -629,18 +522,30 @@ exports.updatePackage = async (req, res) => {
 
       for (let i = 0; i < destinations.length; i++) {
         const dest = destinations[i] || {};
-        const destImage = await uploadBufferToCloudinary(destFiles[i], 'package_uploads') || dest.image || null;
+        let fileForDest = null;
+        if (dest.imageIndex !== undefined && dest.imageIndex !== null && destFiles[dest.imageIndex]) {
+          fileForDest = destFiles[dest.imageIndex];
+        } else if (destFiles.length === destinations.length) {
+          fileForDest = destFiles[i];
+        }
+        const destImage = fileForDest ? await uploadBufferToCloudinary(fileForDest, 'package_uploads') : (dest.image || null);
+        const lat = (dest.latitude !== undefined && dest.latitude !== null && dest.latitude !== '')
+          ? parseFloat(dest.latitude)
+          : ((dest.lat !== undefined && dest.lat !== null && dest.lat !== '') ? parseFloat(dest.lat) : null);
+        const lng = (dest.longitude !== undefined && dest.longitude !== null && dest.longitude !== '')
+          ? parseFloat(dest.longitude)
+          : ((dest.lng !== undefined && dest.lng !== null && dest.lng !== '') ? parseFloat(dest.lng) : null);
 
         const { rows: placeRows } = await client.query(
-          `INSERT INTO place (place_name, image_url, description) VALUES ($1, $2, $3) RETURNING place_id`,
-          [dest.name || null, destImage, dest.description || null]
+          `INSERT INTO place (place_name, image_url, description, latitude, longitude) VALUES ($1, $2, $3, $4, $5) RETURNING place_id`,
+          [dest.name || null, destImage, dest.description || null, lat, lng]
         );
         const placeId = placeRows[0].place_id;
 
         const dayNumber = dest.dayNumber || (i + 1);
         await client.query(
-          `INSERT INTO package_place (package_id, place_id, day_number) VALUES ($1, $2, $3)`,
-          [id, placeId, dayNumber]
+          `INSERT INTO package_place (package_id, place_id, day_number, latitude, longitude) VALUES ($1, $2, $3, $4, $5)`,
+          [id, placeId, dayNumber, lat, lng]
         );
 
         const activities = Array.isArray(dest.activities) ? dest.activities : [];
@@ -669,7 +574,7 @@ exports.updatePackage = async (req, res) => {
     }
   } catch (error) {
     console.error('updatePackage failed:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to update package or upload its images.' });
   }
 };
 
@@ -766,3 +671,41 @@ exports.deletePackage = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.getNearbyPlaces = async (req, res) => {
+  const { lat, lng, radius } = req.query;
+  if (!lat || !lng) {
+    return res.status(400).json({ error: 'lat and lng query parameters are required.' });
+  }
+
+  const latitude = parseFloat(lat);
+  const longitude = parseFloat(lng);
+  const radiusKm = radius ? parseFloat(radius) : 50;
+
+  if (isNaN(latitude) || isNaN(longitude)) {
+    return res.status(400).json({ error: 'Invalid lat or lng parameters.' });
+  }
+
+  try {
+    const { rows } = await db.query(
+      'SELECT * FROM fn_get_places_nearby($1, $2, $3)',
+      [latitude, longitude, radiusKm]
+    );
+
+    res.json({
+      places: rows.map((r) => ({
+        id: r.place_id,
+        name: r.place_name,
+        description: r.description,
+        image: r.image_url,
+        latitude: r.latitude ? parseFloat(r.latitude) : null,
+        longitude: r.longitude ? parseFloat(r.longitude) : null,
+        distanceKm: r.distance_km ? parseFloat(r.distance_km) : null,
+      })),
+    });
+  } catch (error) {
+    console.error('getNearbyPlaces error:', error);
+    res.status(500).json({ error: 'Failed to find nearby places.' });
+  }
+};
+

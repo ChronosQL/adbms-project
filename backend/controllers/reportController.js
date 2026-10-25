@@ -209,7 +209,7 @@ const getBusinessOverviewData = async () => {
   const summary = await queryOne(`
     SELECT
       (SELECT COUNT(*) FROM booking) AS total_bookings,
-      (SELECT COALESCE(SUM(amount), 0) FROM payment) AS total_earnings,
+      (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE status = 'APPROVED') AS total_earnings,
       (SELECT COUNT(*) FROM booking WHERE booking_status = 'COMPLETED') AS completed_tours,
       (SELECT COUNT(*) FROM booking WHERE booking_status = 'CANCELLED') AS cancelled_bookings,
       (SELECT COALESCE(ROUND(AVG(rating), 1), 0) FROM review) AS average_rating
@@ -226,13 +226,23 @@ const getBusinessOverviewData = async () => {
 
 const getMonthlyEarningsData = async () => {
   const currentYear = new Date().getFullYear();
-  const rows = await queryAll(`
-    SELECT EXTRACT(MONTH FROM received_date) AS month, COALESCE(SUM(amount), 0) AS earnings
-    FROM payment
-    WHERE EXTRACT(YEAR FROM received_date) = $1
-    GROUP BY EXTRACT(MONTH FROM received_date)
-    ORDER BY EXTRACT(MONTH FROM received_date)
+  let rows = await queryAll(`
+    SELECT month, total_earnings AS earnings
+    FROM mv_monthly_financial_metrics
+    WHERE year = $1
+    ORDER BY month ASC
   `, [currentYear]);
+
+  // Fallback to live query if materialized view is empty
+  if (!rows.length) {
+    rows = await queryAll(`
+      SELECT EXTRACT(MONTH FROM received_date) AS month, COALESCE(SUM(amount), 0) AS earnings
+      FROM payment
+      WHERE status = 'APPROVED' AND EXTRACT(YEAR FROM received_date) = $1
+      GROUP BY EXTRACT(MONTH FROM received_date)
+      ORDER BY EXTRACT(MONTH FROM received_date)
+    `, [currentYear]);
+  }
 
   const months = Array.from({ length: 12 }, (_, index) => {
     const row = rows.find((item) => Number(item.month) === index + 1);
@@ -242,12 +252,22 @@ const getMonthlyEarningsData = async () => {
     };
   });
 
-  const yearlyRows = await queryAll(`
-    SELECT EXTRACT(YEAR FROM received_date) AS year, COALESCE(SUM(amount), 0) AS earnings
-    FROM payment
-    GROUP BY EXTRACT(YEAR FROM received_date)
-    ORDER BY EXTRACT(YEAR FROM received_date) DESC
+  let yearlyRows = await queryAll(`
+    SELECT year, SUM(total_earnings) AS earnings
+    FROM mv_monthly_financial_metrics
+    GROUP BY year
+    ORDER BY year DESC
   `);
+
+  if (!yearlyRows.length) {
+    yearlyRows = await queryAll(`
+      SELECT EXTRACT(YEAR FROM received_date) AS year, COALESCE(SUM(amount), 0) AS earnings
+      FROM payment
+      WHERE status = 'APPROVED'
+      GROUP BY EXTRACT(YEAR FROM received_date)
+      ORDER BY EXTRACT(YEAR FROM received_date) DESC
+    `);
+  }
 
   return { months, yearlyRows };
 };

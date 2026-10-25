@@ -7,6 +7,7 @@ import { BRAND, FONT, getTheme } from "../AdminDashboard/adminTheme";
 import BookingFilters from "./BookingFilters";
 import BookingTable   from "./BookingTable";
 import BookingModal   from "./BookingModal";
+import Pagination     from "../../../common/Pagination";
 
 export default function ApproveBookings() {
   const context = useOutletContext();
@@ -37,6 +38,23 @@ export default function ApproveBookings() {
   const [statusFilter, setStatus]      = useState("ALL");
   const [typeFilter,   setTypeFilter]  = useState("ALL");
   const [selected,     setSelected]    = useState(null);
+  const [page,         setPage]        = useState(1);
+  const [limit,        setLimit]       = useState(10);
+
+  const handleSearchChange = (val) => {
+    setSearch(val);
+    setPage(1);
+  };
+
+  const handleStatusChange = (val) => {
+    setStatus(val);
+    setPage(1);
+  };
+
+  const handleTypeChange = (val) => {
+    setTypeFilter(val);
+    setPage(1);
+  };
 
   // Status counts for filter badges
   const counts = Object.keys(STATUS_CFG).reduce((acc, s) => {
@@ -67,6 +85,10 @@ export default function ApproveBookings() {
     const matchType   = typeFilter   === "ALL" || b.tourType === typeFilter;
     return matchSearch && matchStatus && matchType;
   });
+
+  const totalPages = Math.ceil(filtered.length / limit) || 1;
+  const currentPage = Math.min(page, totalPages);
+  const paginated = filtered.slice((currentPage - 1) * limit, currentPage * limit);
 
   // Modal handlers — async, re-sync selected booking after mutations
   const handleSetQuote = async (id, price, vehicleInfo) => {
@@ -103,19 +125,39 @@ export default function ApproveBookings() {
       {/* Filters */}
       <BookingFilters
         dark={dark}
-        search={search}       onSearch={setSearch}
-        statusFilter={statusFilter} onStatus={setStatus}
-        typeFilter={typeFilter}     onType={setTypeFilter}
+        search={search}             onSearch={handleSearchChange}
+        statusFilter={statusFilter} onStatus={handleStatusChange}
+        typeFilter={typeFilter}     onType={handleTypeChange}
         counts={counts}
         total={bookings.length}
       />
 
       {/* Table */}
       <BookingTable
-        bookings={filtered}
+        bookings={paginated}
         dark={dark}
         onView={setSelected}
       />
+
+      {/* Pagination */}
+      <div style={{ marginTop: 20 }}>
+        <Pagination
+          pagination={{
+            page: currentPage,
+            totalPages,
+            total: filtered.length,
+            limit,
+          }}
+          onPageChange={setPage}
+          onLimitChange={(newLimit) => {
+            setLimit(newLimit);
+            setPage(1);
+          }}
+          limitOptions={[10, 20, 50]}
+          itemLabel="bookings"
+          scrollToRef={false}
+        />
+      </div>
 
       {/* Detail modal */}
       {selected && (

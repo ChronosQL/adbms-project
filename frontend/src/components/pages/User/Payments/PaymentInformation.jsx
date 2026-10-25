@@ -23,14 +23,18 @@ const PaymentInformation = ({
 
       <div className="mb-4">
         <InfoRow label="Payment Method" value={paymentMethod} />
-        <InfoRow label="Bank Name" value={bankName} />
-        <InfoRow label="Account Number" value={accountNumber} />
-        <InfoRow label="Account Name" value={accountName} />
+        {paymentMethod === "Bank Transfer" && <>
+          <InfoRow label="Bank Name" value={bankName} />
+          <InfoRow label="Account Number" value={accountNumber} />
+          <InfoRow label="Account Name" value={accountName} />
+        </>}
+        {paymentMethod.startsWith("Cash") && <p className="text-xs text-gray-500 mt-3">Cash submissions are recorded after an administrator verifies the amount received.</p>}
+        {paymentMethod === "Select per payment" && <p className="text-xs text-gray-500 mt-3">Choose a method for each payment. You can use cash for one installment and bank transfer for another.</p>}
       </div>
 
       <button
         onClick={onDownloadInvoice}
-        className="inline-flex items-center gap-2 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-4 py-2 rounded-lg transition-colors w-full justify-center"
+        className="inline-flex items-center gap-2 text-xs font-bold text-[#EF8354] bg-[#EF8354]/10 hover:bg-[#EF8354]/20 border border-[#EF8354]/30 px-4 py-2.5 rounded-xl transition-colors w-full justify-center cursor-pointer"
       >
         <Download size={13} />
         Download Invoice

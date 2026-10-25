@@ -282,7 +282,7 @@ function UserProfile() {
   );
 
 // Bookings Tab 
-const BookingsTab = () => <MyBookings userEmail={user?.email} />;
+const BookingsTab = () => <MyBookings userEmail={user?.email} isEmbedded={true} />;
 
 // adding messages tab
   const MessagesTab = () => {

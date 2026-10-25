@@ -5,8 +5,11 @@ const {
   getPaymentsForBooking,
   recordPayment,
   uploadPaymentSlip,
+  updatePaymentSlip,
   approvePayment,
-  rejectPayment
+  rejectPayment,
+  getPaymentReceiptDownloadUrl,
+  downloadPaymentInvoice,
 } = require('../controllers/paymentController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { adminOnly } = require('../middleware/adminMiddleware');
@@ -14,14 +17,17 @@ const upload = require('../middleware/paymentUploadMiddleware');
 
 // ── Admin routes ──────────────────────────────────────────────────────────────
 router.get('/', verifyToken, adminOnly, getAllPayments);
-router.post('/', verifyToken, adminOnly, recordPayment);
+router.post('/', verifyToken, adminOnly, upload.single('slip'), recordPayment);
 router.patch('/:paymentId/approve', verifyToken, adminOnly, approvePayment);
 router.patch('/:paymentId/reject', verifyToken, adminOnly, rejectPayment);
 
-// ── Customer routes ───────────────────────────────────────────────────────────
+// ── Customer & Shared routes ──────────────────────────────────────────────────
 router.post('/upload-slip', verifyToken, upload.single('slip'), uploadPaymentSlip);
+router.patch('/:paymentId/slip', verifyToken, upload.single('slip'), updatePaymentSlip);
 
 // ── Shared routes ─────────────────────────────────────────────────────────────
 router.get('/booking/:bookingId', verifyToken, getPaymentsForBooking);
+router.get('/booking/:bookingId/invoice', verifyToken, downloadPaymentInvoice);
+router.get('/:paymentId/receipt/download-url', verifyToken, getPaymentReceiptDownloadUrl);
 
 module.exports = router;

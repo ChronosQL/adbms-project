@@ -1,19 +1,14 @@
 import React from 'react';
+import { CarFront, Edit2, Trash2 } from 'lucide-react';
+import { BRAND, STATE } from '../AdminDashboard/adminTheme';
 
-const categoryIcons = {
-    'Mini Car': '🚗',
-    'Normal Car': '🚙',
-    'Sedan Car': '🚘',
-    'MPV': '🚐',
-    'SUV': '🏎️',
-    'Mini Van': '🚌',
-    'Van': '🚍',
-    'Large Van': '🚛',
-};
-
-const CategoryCard = ({ category, isSelected, onClick, onEdit, onDelete }) => {
-    const icon = categoryIcons[category.name] || '🚗';
+const CategoryCard = ({ category, isSelected, onClick, onEdit, onDelete, dark = false, t }) => {
     const hasImage = Boolean(category.image_url);
+
+    const cardBg = t ? t.cardBg : (dark ? "#383C4E" : "#FFFFFF");
+    const cardBorder = t ? t.cardBorder : (dark ? "rgba(255,255,255,0.08)" : "#E8E8EA");
+    const textPrimary = t ? t.textPrimary : (dark ? "#FFFFFF" : BRAND.gunmetal);
+    const textSecondary = t ? t.textSecondary : (dark ? "#B7BAC7" : BRAND.payneGray);
 
     const handleEdit = (event) => {
         event.stopPropagation();
@@ -28,43 +23,55 @@ const CategoryCard = ({ category, isSelected, onClick, onEdit, onDelete }) => {
     return (
         <div
             onClick={() => onClick(category)}
-            className={`cursor-pointer rounded-xl p-4 border-2 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 relative group ${
-                isSelected
-                    ? 'border-blue-500 bg-blue-50 shadow-md'
-                    : 'border-gray-200 bg-white hover:border-blue-300'
-            }`}
+            className="cursor-pointer rounded-2xl p-3 border-2 transition-all duration-200 hover:shadow-md transform hover:-translate-y-0.5 relative group"
+            style={{
+                borderColor: isSelected ? BRAND.coral : cardBorder,
+                background: isSelected ? "rgba(239, 131, 84, 0.1)" : cardBg,
+            }}
         >
             {(onEdit || onDelete) && (
-                <div className="absolute right-2 top-2 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <div className="absolute right-2 top-2 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
                     {onEdit && (
                         <button
                             type="button"
                             onClick={handleEdit}
-                            className="rounded-full bg-white/95 p-2 text-blue-600 shadow-sm ring-1 ring-blue-100 hover:bg-blue-50"
+                            className="rounded-full p-1.5 shadow-xs transition-colors cursor-pointer"
+                            style={{
+                                background: dark ? "#242838" : "#FFFFFF",
+                                color: BRAND.coral,
+                                border: `1px solid ${cardBorder}`,
+                            }}
                             aria-label={`Edit ${category.name}`}
                         >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.586a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
+                            <Edit2 size={13} />
                         </button>
                     )}
                     {onDelete && (
                         <button
                             type="button"
                             onClick={handleDelete}
-                            className="rounded-full bg-white/95 p-2 text-red-600 shadow-sm ring-1 ring-red-100 hover:bg-red-50"
+                            className="rounded-full p-1.5 shadow-xs transition-colors cursor-pointer"
+                            style={{
+                                background: dark ? "#242838" : "#FFFFFF",
+                                color: STATE.danger,
+                                border: `1px solid ${cardBorder}`,
+                            }}
                             aria-label={`Delete ${category.name}`}
                         >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            <Trash2 size={13} />
                         </button>
                     )}
                 </div>
             )}
 
             <div className="flex flex-col items-center text-center">
-                <div className="mb-3 h-20 w-full overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-sm flex items-center justify-center">
+                <div
+                    className="mb-2.5 h-16 w-full overflow-hidden rounded-xl border flex items-center justify-center"
+                    style={{
+                        background: dark ? "rgba(255,255,255,0.03)" : "#F8FAFC",
+                        borderColor: cardBorder,
+                    }}
+                >
                     {hasImage ? (
                         <img
                             src={category.image_url}
@@ -72,19 +79,16 @@ const CategoryCard = ({ category, isSelected, onClick, onEdit, onDelete }) => {
                             className="h-full w-full object-cover"
                         />
                     ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 to-gray-100">
-                            <span className="text-4xl">{icon}</span>
-                        </div>
+                        <CarFront size={28} style={{ color: isSelected ? BRAND.coral : textSecondary }} />
                     )}
                 </div>
                 <h3
-                    className={`font-semibold text-sm ${
-                        isSelected ? 'text-blue-700' : 'text-gray-700'
-                    }`}
+                    className="font-bold text-xs truncate w-full"
+                    style={{ color: isSelected ? BRAND.coral : textPrimary, fontFamily: "'Montserrat', sans-serif" }}
                 >
                     {category.name}
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-[11px] font-medium mt-0.5" style={{ color: textSecondary }}>
                     {category.vehicle_count || 0} vehicles
                 </p>
             </div>

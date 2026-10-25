@@ -89,13 +89,13 @@ const AdminPackageDeleteModal = ({ pkg, onConfirm, onCancel, dark = false }) => 
       .apdm-btns { display: flex; gap: 10px; width: 100%; margin-top: 4px; }
       .apdm-cancel {
         flex: 1; padding: 13px; border-radius: 10px;
-        border: 1.5px solid rgba(0,176,165,0.2);
-        background: transparent; color: #5a8080;
+        border: 1.5px solid #E8E8EA;
+        background: transparent; color: #4F5D75;
         font-size: 13px; font-weight: 700;
         letter-spacing: 0.06em; text-transform: uppercase;
         cursor: pointer; transition: all 0.2s ease;
       }
-      .apdm-cancel:hover { border-color: #00b0a5; color: #00b0a5; }
+      .apdm-cancel:hover { border-color: #EF8354; color: #EF8354; }
       .apdm-modal.dark .apdm-cancel {
         border-color: rgba(255,255,255,0.18);
         color: #cbd5e1;

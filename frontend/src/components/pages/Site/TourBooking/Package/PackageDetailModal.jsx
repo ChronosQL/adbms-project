@@ -111,22 +111,13 @@ const PackageDetailModal = ({ pkg, onClose, onShowMore }) => {
           position: absolute; bottom: 28px; left: 32px; right: 90px;
         }
         .pdm-type-badge {
-<<<<<<< HEAD
           display: inline-flex; align-items: center; gap: 6px;
           padding: 5px 16px; border-radius: 100px;
-          background: rgba(0,176,165,0.9); backdrop-filter: blur(8px);
+          background: #EF8354; backdrop-filter: blur(8px);
           color: #fff; font-size: 9px; font-weight: 800;
-          letter-spacing: 0.22em; text-transform: uppercase;
-          margin-bottom: 12px;
-          border: 1px solid rgba(255,255,255,0.25);
-=======
-          display: inline-block;
-          padding: 4px 14px; border-radius: 100px;
-          background: #EF8354; color: #fff;
-          font-size: 9px; font-weight: 800;
           letter-spacing: 0.2em; text-transform: uppercase;
           margin-bottom: 10px;
->>>>>>> Kolitha
+          border: 1px solid rgba(255,255,255,0.3);
         }
         .pdm-title {
           font-size: clamp(1.7rem, 3.5vw, 2.4rem);
@@ -170,27 +161,23 @@ const PackageDetailModal = ({ pkg, onClose, onShowMore }) => {
           padding-left: 16px;
         }
 
-<<<<<<< HEAD
-        /* ─── Section heading ──────────────────────── */
-=======
         /* Highlights */
         .pdm-highlights {
           display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px;
         }
         .pdm-hl {
           padding: 5px 14px; border-radius: 100px;
-          background: rgba(0,176,165,0.08);
-          border: 1px solid rgba(0,176,165,0.25);
+          background: rgba(239, 131, 84, 0.08);
+          border: 1px solid rgba(239, 131, 84, 0.25);
           font-size: 11px; font-weight: 600; color: #EF8354;
           letter-spacing: 0.06em;
         }
 
         /* Section heading */
->>>>>>> Kolitha
         .pdm-section-heading {
           font-size: 14px; font-weight: 900;
           letter-spacing: 0.28em; text-transform: uppercase;
-          color: #00b0a5; margin-bottom: 18px;
+          color: #EF8354; margin-bottom: 18px;
           display: flex; align-items: center; gap: 12px;
         }
         .pdm-section-heading::after {
@@ -261,16 +248,10 @@ const PackageDetailModal = ({ pkg, onClose, onShowMore }) => {
           padding: 12px 0 0 0; margin-top: 10px;
         }
         .pdm-activities-label {
-<<<<<<< HEAD
-          font-size: 8px; font-weight: 900;
-          letter-spacing: 0.2em; text-transform: uppercase;
-          color: #00b0a5; margin-bottom: 10px; display: block;
-=======
           font-size: 9px; font-weight: 700;
           letter-spacing: 0.15em; text-transform: uppercase;
           color: #EF8354; margin-bottom: 8px;
           display: block;
->>>>>>> Kolitha
         }
         .pdm-activity-item {
           margin-bottom: 10px; padding-bottom: 10px;
@@ -305,49 +286,32 @@ const PackageDetailModal = ({ pkg, onClose, onShowMore }) => {
         }
         .pdm-book-btn {
           display: inline-flex; align-items: center; gap: 10px;
-<<<<<<< HEAD
-          background: linear-gradient(135deg, #00b0a5, #007a72);
-          color: #fff; font-size: 13px; font-weight: 700;
-=======
           background: #EF8354; color: #fff;
           font-size: 13px; font-weight: 700;
->>>>>>> Kolitha
           letter-spacing: 0.1em; text-transform: uppercase;
           padding: 15px 30px; border-radius: 14px;
           text-decoration: none;
-          box-shadow: 0 8px 28px -4px rgba(0,176,165,0.5);
+          box-shadow: 0 8px 28px -4px rgba(239, 131, 84, 0.45);
           transition: all 0.25s ease;
         }
-<<<<<<< HEAD
-        .pdm-book-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 36px -4px rgba(0,176,165,0.6); }
-=======
         .pdm-book-btn:hover { background: #4F5D75; transform: translateY(-2px); }
->>>>>>> Kolitha
         .pdm-close-btn {
           display: inline-flex; align-items: center; gap: 8px;
-          background: transparent; color: #6a9090;
-          font-size: 13px; font-weight: 600;
+          background: transparent; color: #2D3142;
+          font-size: 13px; font-weight: 700;
           padding: 15px 22px; border-radius: 14px;
-          border: 1.5px solid rgba(0,176,165,0.2);
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
           cursor: pointer; transition: all 0.2s ease;
         }
-        .pdm-close-btn:hover { border-color: #00b0a5; color: #00b0a5; background: rgba(0,176,165,0.05); }
+        .pdm-close-btn:hover { border-color: #EF8354; color: #EF8354; background: rgba(239, 131, 84, 0.08); }
 
         /* ─── Recommendations ───────────────────────── */
         .pdm-rec-panel {
           margin-top: 4px; padding: 24px;
-          background: linear-gradient(180deg, #f5fffe 0%, #fff 100%);
-          border: 1.5px solid rgba(0,176,165,0.13);
-=======
-        .pdm-close-btn:hover { border-color: #EF8354; color: #EF8354; }
-        /* Recommendations compact layout */
-        .pdm-rec-group { margin-bottom: 18px; }
-        .pdm-rec-shell {
-          border: 1px solid rgba(0,176,165,0.12);
-          background: linear-gradient(180deg, rgba(236,255,253,0.9) 0%, rgba(255,255,255,0.98) 100%);
->>>>>>> Kolitha
+          background: #fafafa;
+          border: 1.5px solid rgba(239, 131, 84, 0.15);
           border-radius: 22px;
-          box-shadow: 0 8px 32px rgba(0,60,50,0.05);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.05);
         }
         .pdm-rec-tab-row {
           display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
@@ -355,26 +319,24 @@ const PackageDetailModal = ({ pkg, onClose, onShowMore }) => {
         .pdm-rec-tab {
           padding: 7px 16px; border-radius: 100px;
           font-size: 11px; font-weight: 700;
-          border: 1.5px solid rgba(0,176,165,0.18);
-          background: transparent; color: #7a9a9a;
+          border: 1.5px solid rgba(239, 131, 84, 0.2);
+          background: transparent; color: #4F5D75;
           cursor: pointer; transition: all 0.2s;
           letter-spacing: 0.04em;
         }
-<<<<<<< HEAD
-        .pdm-rec-tab:hover { border-color: #00b0a5; color: #00b0a5; background: rgba(0,176,165,0.05); }
+        .pdm-rec-tab:hover { border-color: #EF8354; color: #EF8354; background: rgba(239, 131, 84, 0.05); }
         .pdm-rec-tab.active {
-          background: linear-gradient(135deg, #00b0a5, #007a72);
+          background: #EF8354;
           border-color: transparent; color: #fff;
-          box-shadow: 0 4px 14px rgba(0,176,165,0.35);
-=======
+          box-shadow: 0 4px 14px rgba(239, 131, 84, 0.35);
+        }
         .pdm-rec-pill {
           display: inline-flex; align-items: center; gap: 6px;
           padding: 5px 10px; border-radius: 999px;
-          background: rgba(0,176,165,0.08);
+          background: rgba(239, 131, 84, 0.08);
           color: #EF8354; font-size: 10px; font-weight: 800;
           letter-spacing: 0.08em; text-transform: uppercase;
-          border: 1px solid rgba(0,176,165,0.14);
->>>>>>> Kolitha
+          border: 1px solid rgba(239, 131, 84, 0.2);
         }
         .pdm-rec-scroll {
           display: flex; gap: 14px;
