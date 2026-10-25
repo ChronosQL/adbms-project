@@ -100,11 +100,11 @@ const CategoryForm = ({ isOpen, onClose, onSubmit, category, loading }) => {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5 p-6">
+                <form onSubmit={handleSubmit} autoComplete="off" className="space-y-5 p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="md:col-span-2">
-                            <label className="mb-1 block text-sm font-medium text-gray-700">
-                                Category Name <span className="text-red-500">*</span>
+                            <label className="mb-1.5 block text-sm font-semibold text-[#2D3142]">
+                                Category Name <span className="text-[#E0483B]">*</span>
                             </label>
                             <input
                                 type="text"
@@ -112,106 +112,106 @@ const CategoryForm = ({ isOpen, onClose, onSubmit, category, loading }) => {
                                 value={formData.name}
                                 onChange={handleChange}
                                 placeholder="e.g., Luxury SUV"
-                                className={`w-full rounded-lg border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 ${
-                                    errors.name ? 'border-red-500' : 'border-gray-300'
+                                className={`w-full rounded-xl border px-3.5 py-2.5 bg-white text-[#2D3142] placeholder:text-gray-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 text-sm transition-all ${
+                                    errors.name ? 'border-[#E0483B]' : 'border-gray-300 hover:border-gray-400'
                                 }`}
                             />
-                            {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
+                            {errors.name && <p className="mt-1 text-xs text-[#E0483B]">{errors.name}</p>}
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-700">Passenger Capacity</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-[#2D3142]">Passenger Capacity</label>
                             <input
                                 type="text"
                                 name="passenger_capacity"
                                 value={formData.passenger_capacity}
                                 onChange={handleChange}
                                 placeholder="e.g., 2-3 passengers"
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-gray-300 hover:border-gray-400 px-3.5 py-2.5 bg-white text-[#2D3142] placeholder:text-gray-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 text-sm transition-all"
                             />
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-700">Luggage Capacity</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-[#2D3142]">Luggage Capacity</label>
                             <input
                                 type="text"
                                 name="luggage_capacity"
                                 value={formData.luggage_capacity}
                                 onChange={handleChange}
                                 placeholder="e.g., 2-3 luggages"
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-gray-300 hover:border-gray-400 px-3.5 py-2.5 bg-white text-[#2D3142] placeholder:text-gray-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 text-sm transition-all"
                             />
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-700">Best For</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-[#2D3142]">Best For</label>
                             <input
                                 type="text"
                                 name="best_for"
                                 value={formData.best_for}
                                 onChange={handleChange}
                                 placeholder="e.g., Families, Couples"
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-gray-300 hover:border-gray-400 px-3.5 py-2.5 bg-white text-[#2D3142] placeholder:text-gray-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 text-sm transition-all"
                             />
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-gray-700">Comfort Level</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-[#2D3142]">Comfort Level</label>
                             <input
                                 type="text"
                                 name="comfort_level"
                                 value={formData.comfort_level}
                                 onChange={handleChange}
                                 placeholder="e.g., Premium, Standard"
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-gray-300 hover:border-gray-400 px-3.5 py-2.5 bg-white text-[#2D3142] placeholder:text-gray-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 text-sm transition-all"
                             />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="mb-1 block text-sm font-medium text-gray-700">Ideal Trip Types</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-[#2D3142]">Ideal Trip Types</label>
                             <input
                                 type="text"
                                 name="ideal_trip_types"
                                 value={formData.ideal_trip_types}
                                 onChange={handleChange}
                                 placeholder="e.g., City Tours, Airport Transfers"
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-gray-300 hover:border-gray-400 px-3.5 py-2.5 bg-white text-[#2D3142] placeholder:text-gray-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 text-sm transition-all"
                             />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-[#2D3142] cursor-pointer">
                                 <input
                                     type="checkbox"
                                     name="ac_available"
                                     checked={formData.ac_available}
                                     onChange={handleChange}
-                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                    className="rounded border-gray-300 text-[#EF8354] focus:ring-[#EF8354] w-4 h-4 cursor-pointer"
                                 />
                                 AC Available
                             </label>
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-[#2D3142]">Description</label>
                             <textarea
                                 name="description"
                                 value={formData.description}
                                 onChange={handleChange}
                                 rows="3"
                                 placeholder="Short description about this category"
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-gray-300 hover:border-gray-400 px-3.5 py-2.5 bg-white text-[#2D3142] placeholder:text-gray-400 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20 text-sm transition-all"
                             />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="mb-1 block text-sm font-medium text-gray-700">Category Images</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-[#2D3142]">Category Images</label>
                             <input
                                 type="file"
                                 accept="image/*"
                                 multiple
                                 onChange={handleImageChange}
-                                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-xl border border-gray-300 hover:border-gray-400 bg-white text-[#2D3142] px-3.5 py-2.5 text-sm file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EF8354]/10 file:text-[#EF8354] hover:file:bg-[#EF8354]/20 focus:outline-none focus:border-[#EF8354] focus:ring-2 focus:ring-[#EF8354]/20"
                             />
                             <p className="mt-1 text-xs text-gray-500">Choose images from your PC for this category.</p>
                             {imagePreviews.length > 0 && (
@@ -230,14 +230,14 @@ const CategoryForm = ({ isOpen, onClose, onSubmit, category, loading }) => {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-lg bg-gray-100 px-6 py-2.5 font-medium text-gray-700 transition-colors hover:bg-gray-200"
+                            className="rounded-xl bg-gray-100 px-6 py-2.5 font-semibold text-[#4F5D75] transition-colors hover:bg-gray-200"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="flex items-center gap-2 rounded-xl bg-[#EF8354] px-6 py-2.5 font-bold text-white transition-all hover:bg-[#d96e41] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
                         >
                             {loading && (
                                 <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">

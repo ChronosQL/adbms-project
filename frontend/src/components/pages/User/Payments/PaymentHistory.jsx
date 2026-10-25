@@ -1,5 +1,5 @@
-import React from "react";
-import { Eye } from "lucide-react";
+import React, { useState } from "react";
+import { Download } from "lucide-react";
 
 const statusStyles = {
   "PENDING VERIFICATION": "text-yellow-600 bg-yellow-50 border border-yellow-200",
@@ -7,7 +7,15 @@ const statusStyles = {
   REJECTED: "text-red-600 bg-red-50 border border-red-200",
 };
 
-const PaymentHistory = ({ transactions = [], onViewSlip }) => {
+const PaymentHistory = ({ transactions = [], downloadPaymentReceipt }) => {
+  const [receiptError, setReceiptError] = useState('');
+
+  const downloadReceipt = async (tx) => {
+    try {
+      setReceiptError('');
+      await downloadPaymentReceipt(tx.rawId);
+    } catch (err) { setReceiptError(err.message || 'Could not download the receipt.'); }
+  };
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">
@@ -61,13 +69,11 @@ const PaymentHistory = ({ transactions = [], onViewSlip }) => {
                   </span>
                 </td>
                 <td className="py-3 text-right">
-                  <button
-                    onClick={() => onViewSlip?.(tx)}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-purple-600 hover:text-purple-800 transition-colors"
-                  >
-                    <Eye size={13} />
-                    View Slip
-                  </button>
+                  {tx.slipUrl ? (
+                    <button type="button" onClick={() => downloadReceipt(tx)} className="inline-flex items-center gap-1.5 text-xs font-medium text-[#EF8354] hover:text-[#c55d35] transition-colors">
+                      <Download size={13} /> Download Receipt
+                    </button>
+                  ) : <span className="text-xs text-gray-400">No receipt</span>}
                 </td>
               </tr>
             ))}
@@ -75,13 +81,13 @@ const PaymentHistory = ({ transactions = [], onViewSlip }) => {
         </table>
       )}
 
-      {/* Footer help text */}
       <p className="text-xs text-gray-400 text-center mt-6">
         Need help with your payment?{" "}
-        <a href="#" className="text-teal-600 font-semibold hover:underline">
+        <a href="#" className="text-[#EF8354] font-semibold hover:underline">
           Contact our support team.
         </a>
       </p>
+      {receiptError && <p role="alert" className="mt-3 text-sm text-red-700">{receiptError}</p>}
     </div>
   );
 };

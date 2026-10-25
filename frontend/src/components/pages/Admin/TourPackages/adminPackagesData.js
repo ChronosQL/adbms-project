@@ -18,6 +18,11 @@ const PACKAGE_DAYS = [7, 14, 21, 28];
 
 const PACKAGES_CHANGED_EVENT = 'sl-admin-packages-changed';
 
+const adminHeaders = () => {
+  const token = localStorage.getItem('cbt_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 let _packages = [];
 const _subscribers = new Set();
 
@@ -39,7 +44,10 @@ const mapBackendPackage = (p) => ({
   image: p.image_url || p.image || '',
   destinations: Array.isArray(p.destinations) ? p.destinations.map(d => ({
     ...d,
+    image: d.image_url || d.image || '',
     days: d.dayNumber || d.days || 1,
+    latitude: d.latitude != null ? parseFloat(d.latitude) : null,
+    longitude: d.longitude != null ? parseFloat(d.longitude) : null,
     activities: (d.activities || []).map(a => ({
       name: a.activity_name || a.name || '',
       phone: a.phone || '',
@@ -58,7 +66,7 @@ const emitPackagesChanged = () => {
 
 const reloadFromBackend = async () => {
   try {
-    const res = await fetch(buildApiUrl('/packages/admin/packages'));
+    const res = await fetch(buildApiUrl('/packages/admin/packages'), { headers: adminHeaders() });
     if (!res.ok) return;
     const data = await res.json();
     _packages = data.map(mapBackendPackage);
@@ -76,7 +84,7 @@ export const packageStore = {
     // fetch packages from backend and notify
     (async () => {
       try {
-        const res = await fetch(buildApiUrl('/packages/admin/packages'));
+        const res = await fetch(buildApiUrl('/packages/admin/packages'), { headers: adminHeaders() });
         if (res.ok) {
           const data = await res.json();
           // map backend shape to frontend store shape
@@ -84,7 +92,7 @@ export const packageStore = {
         } else {
           _packages = [];
         }
-      } catch (e) {
+      } catch {
         _packages = [];
       }
       fn([..._packages]);
@@ -107,16 +115,23 @@ export const packageStore = {
         form.append('packageImage', data.packageImageFile);
       }
 
+      let imgIdx = 0;
       // collect dest images and strip from object sent inside JSON
       const dests = (data.destinations || []).map((d, i) => {
+        let assignedIdx = null;
         if (d.imageFile) {
           form.append('destImages', d.imageFile);
+          assignedIdx = imgIdx++;
         }
         return {
           name: d.name,
           description: d.description,
           dayNumber: d.days || (i + 1),
           activities: d.activities || [],
+          latitude: d.latitude != null ? parseFloat(d.latitude) : (d.lat != null ? parseFloat(d.lat) : null),
+          longitude: d.longitude != null ? parseFloat(d.longitude) : (d.lng != null ? parseFloat(d.lng) : null),
+          image: d.image || d.image_url || null,
+          imageIndex: assignedIdx,
         };
       });
 
@@ -124,6 +139,7 @@ export const packageStore = {
 
       const res = await fetch(buildApiUrl('/packages/admin/packages'), {
         method: 'POST',
+        headers: adminHeaders(),
         body: form,
       });
       if (!res.ok) {
@@ -141,22 +157,8 @@ export const packageStore = {
         throw new Error(message);
       }
       const created = await res.json();
-      const newPkg = {
-        id: `pkg-${created.package_id || created.packageId || Date.now()}`,
-        title: created.title || data.title,
-        type: created.type || data.type,
-        days: created.days || data.days,
-        description: created.description || data.description,
-        image: created.image_url || created.image || data.image || '',
-        destinations: data.destinations || [],
-        highlights: data.highlights || [],
-        availability: normalizeAvailability(created.availability || { status: created.availability_status }),
-        availability_status: normalizeAvailability(created.availability || { status: created.availability_status }).status,
-      };
-      _packages = [newPkg, ..._packages];
-      notify();
-      emitPackagesChanged();
-      return newPkg;
+      await reloadFromBackend();
+      return _packages.find((pkg) => pkg.id === `pkg-${created.package_id}`) || mapBackendPackage(created);
     } catch (err) {
       console.error('package create failed', err);
       throw err;
@@ -196,26 +198,38 @@ export const packageStore = {
       if (data.type != null) form.append('type', data.type);
       if (data.days != null) form.append('days', String(data.days));
       if (data.description != null) form.append('description', data.description || '');
-      if (data.packageImageFile) form.append('packageImage', data.packageImageFile);
+      if (data.packageImageFile) {
+        form.append('packageImage', data.packageImageFile);
+      }
 
+      let updateImgIdx = 0;
       const dests = (data.destinations || []).map((d, i) => {
-        if (d.imageFile) form.append('destImages', d.imageFile);
+        let assignedIdx = null;
+        if (d.imageFile) {
+          form.append('destImages', d.imageFile);
+          assignedIdx = updateImgIdx++;
+        }
         return {
           name: d.name,
           description: d.description,
           dayNumber: d.days || (i + 1),
           activities: d.activities || [],
+          latitude: d.latitude != null ? parseFloat(d.latitude) : (d.lat != null ? parseFloat(d.lat) : null),
+          longitude: d.longitude != null ? parseFloat(d.longitude) : (d.lng != null ? parseFloat(d.lng) : null),
+          image: d.image || d.image_url || null,
+          imageIndex: assignedIdx,
         };
       });
       form.append('destinations', JSON.stringify(dests));
 
       const res = await fetch(buildApiUrl(`/packages/admin/packages/${pkgId}`), {
         method: 'PUT',
+        headers: adminHeaders(),
         body: form,
       });
       if (!res.ok) {
         let msg = 'Failed to update package';
-        try { const body = await res.json(); msg = body.error || body.message || msg; } catch {}
+        try { const body = await res.json(); msg = body.error || body.message || msg; } catch { /* keep fallback message */ }
         throw new Error(msg);
       }
 
@@ -233,10 +247,10 @@ export const packageStore = {
       const m = String(id).match(/(\d+)/);
       if (!m) throw new Error('Invalid package id');
       const pkgId = m[1];
-      const res = await fetch(buildApiUrl(`/packages/admin/packages/${pkgId}`), { method: 'DELETE' });
+      const res = await fetch(buildApiUrl(`/packages/admin/packages/${pkgId}`), { method: 'DELETE', headers: adminHeaders() });
       if (!res.ok) {
         let msg = 'Failed to delete package';
-        try { const body = await res.json(); msg = body.error || body.message || msg; } catch {}
+        try { const body = await res.json(); msg = body.error || body.message || msg; } catch { /* keep fallback message */ }
         throw new Error(msg);
       }
       await reloadFromBackend();
@@ -254,10 +268,10 @@ export const packageStore = {
     const m = String(id).match(/(\d+)/);
     if (!m) throw new Error('Invalid package id');
     const pkgId = m[1];
-    const res = await fetch(buildApiUrl(`/packages/admin/packages/${pkgId}/availability`));
+    const res = await fetch(buildApiUrl(`/packages/admin/packages/${pkgId}/availability`), { headers: adminHeaders() });
     if (!res.ok) {
       let msg = 'Failed to load package availability';
-      try { const body = await res.json(); msg = body.error || body.message || msg; } catch {}
+      try { const body = await res.json(); msg = body.error || body.message || msg; } catch { /* keep fallback message */ }
       throw new Error(msg);
     }
     return res.json();
@@ -277,7 +291,7 @@ export const packageStore = {
     });
     if (!res.ok) {
       let msg = 'Failed to update package availability';
-      try { const body = await res.json(); msg = body.error || body.message || msg; } catch {}
+      try { const body = await res.json(); msg = body.error || body.message || msg; } catch { /* keep fallback message */ }
       throw new Error(msg);
     }
     const updated = await res.json();
@@ -320,6 +334,6 @@ export const emptyPackage = () => ({
   image:        '',
   highlights:   ['', '', '', ''],
   destinations: [
-    { name: '', days: 1, description: '', image: '', imageFile: null, activities: [] },
+    { name: '', days: 1, description: '', image: '', imageFile: null, latitude: null, longitude: null, activities: [] },
   ],
 });

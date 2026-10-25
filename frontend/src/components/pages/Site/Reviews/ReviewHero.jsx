@@ -46,9 +46,9 @@ const ReviewHero = ({ onAddReview, isLoggedIn }) => {
             boxShadow: '0 4px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2)',
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(0,176,165,0.75)';
-            e.currentTarget.style.borderColor = 'rgba(0,220,205,0.6)';
-            e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,176,165,0.45), inset 0 1px 0 rgba(255,255,255,0.2)';
+            e.currentTarget.style.background = '#EF8354';
+            e.currentTarget.style.borderColor = '#EF8354';
+            e.currentTarget.style.boxShadow = '0 8px 28px rgba(239,131,84,0.45), inset 0 1px 0 rgba(255,255,255,0.2)';
           }}
           onMouseLeave={e => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.12)';

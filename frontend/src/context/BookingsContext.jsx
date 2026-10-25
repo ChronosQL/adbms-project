@@ -63,6 +63,29 @@ export const BookingsProvider = ({ children }) => {
     window.URL.revokeObjectURL(url);
   }, []);
 
+  const downloadPaymentInvoice = useCallback(async (bookingId) => {
+    const { blob, fileName } = await api.getBlob(`/payments/booking/${bookingId}/invoice`);
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName || `invoice-${bookingId}.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  }, []);
+
+  const downloadPaymentReceipt = useCallback(async (paymentId) => {
+    const { downloadUrl, fileName } = await api.get(`/payments/${paymentId}/receipt/download-url`);
+    const anchor = document.createElement("a");
+    anchor.href = downloadUrl;
+    anchor.download = fileName || `payment-receipt-${paymentId}`;
+    anchor.rel = "noopener noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }, []);
+
   // ── Payments Integration ──────────────────────────────────────────────────
   const getPaymentsForBooking = useCallback(async (bookingId) => {
     return await api.get(`/payments/booking/${bookingId}`);
@@ -75,18 +98,17 @@ export const BookingsProvider = ({ children }) => {
   }, []);
 
   const recordPayment = useCallback(async (paymentData) => {
-    const res = await api.post(`/payments`, paymentData);
+    const res = paymentData instanceof FormData
+      ? await api.upload(`/payments`, paymentData)
+      : await api.post(`/payments`, paymentData);
     await getAllPayments();
     try { await getAllBookings(); } catch { await getCustomerBookings(); }
     return res;
   }, [getAllBookings, getCustomerBookings, getAllPayments]);
 
   const uploadPaymentSlip = useCallback(async (formData) => {
-    const res = await api.upload('/payments/upload-slip', formData);
-    await getAllPayments();
-    try { await getAllBookings(); } catch { await getCustomerBookings(); }
-    return res;
-  }, [getAllBookings, getCustomerBookings, getAllPayments]);
+    return await api.upload('/payments/upload-slip', formData);
+  }, []);
 
   const approvePayment = useCallback(async (paymentId, notes) => {
     const res = await api.patch(`/payments/${paymentId}/approve`, { notes });
@@ -118,6 +140,8 @@ export const BookingsProvider = ({ children }) => {
         rejectQuote,
         cancelBooking,
         downloadConfirmationPdf,
+        downloadPaymentInvoice,
+        downloadPaymentReceipt,
         getPendingCount,
         getPendingPaymentsCount,
         getPaymentsForBooking,

@@ -163,7 +163,7 @@ const ReviewForm = ({ reviewableTours = [], onSubmit, onCancel }) => {
         .rvf-label {
           font-size: 10px; font-weight: 700;
           letter-spacing: 0.2em; text-transform: uppercase;
-          color: #3a5a5a;
+          color: #4F5D75;
         }
         .rvf-error {
           font-size: 11px; font-weight: 600; color: #cc3344;
@@ -173,8 +173,8 @@ const ReviewForm = ({ reviewableTours = [], onSubmit, onCancel }) => {
         /* Select */
         .rvf-select {
           padding: 12px 16px; border-radius: 10px;
-          border: 1.5px solid rgba(0,176,165,0.25);
-          background: #f7fffe; color: #0d2b2b;
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
+          background: #ffffff; color: #2D3142;
           font-size: 14px; font-weight: 400;
           outline: none; cursor: pointer;
           transition: border-color 0.2s ease;
@@ -186,8 +186,8 @@ const ReviewForm = ({ reviewableTours = [], onSubmit, onCancel }) => {
         /* Input */
         .rvf-input {
           padding: 12px 16px; border-radius: 10px;
-          border: 1.5px solid rgba(0,176,165,0.25);
-          background: #f7fffe; color: #0d2b2b;
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
+          background: #ffffff; color: #2D3142;
           font-size: 14px; font-weight: 400;
           outline: none; font-family: inherit;
           transition: border-color 0.2s ease;
@@ -198,9 +198,9 @@ const ReviewForm = ({ reviewableTours = [], onSubmit, onCancel }) => {
         /* Textarea */
         .rvf-textarea {
           padding: 14px 16px; border-radius: 10px;
-          border: 1.5px solid rgba(0,176,165,0.25);
-          background: #f7fffe; color: #0d2b2b;
-          font-size: 14px; font-weight: 300;
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
+          background: #ffffff; color: #2D3142;
+          font-size: 14px; font-weight: 400;
           outline: none; resize: vertical; min-height: 130px;
           font-family: inherit; line-height: 1.7;
           transition: border-color 0.2s ease;
@@ -224,7 +224,7 @@ const ReviewForm = ({ reviewableTours = [], onSubmit, onCancel }) => {
         .rvf-img-thumb-wrap {
           position: relative; width: 80px; height: 70px;
           border-radius: 10px; overflow: hidden;
-          border: 1px solid rgba(0,176,165,0.2);
+          border: 1px solid rgba(239, 131, 84, 0.2);
         }
         .rvf-img-thumb { width: 100%; height: 100%; object-fit: cover; }
         .rvf-img-remove {
@@ -236,15 +236,15 @@ const ReviewForm = ({ reviewableTours = [], onSubmit, onCancel }) => {
         }
         .rvf-img-add {
           width: 80px; height: 70px; border-radius: 10px;
-          border: 1.5px dashed rgba(0,176,165,0.4);
-          background: rgba(0,176,165,0.04);
+          border: 1.5px dashed rgba(239, 131, 84, 0.4);
+          background: rgba(239, 131, 84, 0.04);
           display: flex; flex-direction: column; align-items: center;
           justify-content: center; gap: 4px;
           cursor: pointer; color: #EF8354;
           font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
           transition: all 0.2s ease;
         }
-        .rvf-img-add:hover { background: rgba(0,176,165,0.08); border-color: #EF8354; }
+        .rvf-img-add:hover { background: rgba(239, 131, 84, 0.08); border-color: #EF8354; }
         .rvf-img-hint {
           font-size: 10px; font-weight: 400; color: #7a9a9a;
           margin-top: 4px;
@@ -253,7 +253,7 @@ const ReviewForm = ({ reviewableTours = [], onSubmit, onCancel }) => {
         /* Rule */
         .rvf-rule {
           height: 1px;
-          background: linear-gradient(90deg, rgba(0,176,165,0.15), transparent);
+          background: linear-gradient(90deg, rgba(239, 131, 84, 0.2), transparent);
         }
 
         /* Actions */
@@ -265,15 +265,15 @@ const ReviewForm = ({ reviewableTours = [], onSubmit, onCancel }) => {
           letter-spacing: 0.1em; text-transform: uppercase;
           padding: 14px 24px; border-radius: 10px; border: none;
           cursor: pointer;
-          box-shadow: 0 6px 24px -4px rgba(0,176,165,0.45);
+          box-shadow: 0 6px 24px -4px rgba(239, 131, 84, 0.45);
           transition: all 0.25s ease;
         }
         .rvf-submit:hover { background: #4F5D75; transform: translateY(-1px); }
         .rvf-clear {
           display: inline-flex; align-items: center; justify-content: center;
           padding: 14px 20px; border-radius: 10px;
-          border: 1.5px solid rgba(0,176,165,0.25);
-          background: transparent; color: #5a8080;
+          border: 1.5px solid rgba(239, 131, 84, 0.25);
+          background: transparent; color: #4F5D75;
           font-size: 13px; font-weight: 700;
           letter-spacing: 0.08em; text-transform: uppercase;
           cursor: pointer;

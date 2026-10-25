@@ -11,25 +11,25 @@ const AuthGate = ({ onClose, t }) => (
       }
       .rvm-auth-icon {
         width: 72px; height: 72px; border-radius: 50%;
-        background: linear-gradient(135deg, rgba(0,176,165,0.12), rgba(0,176,165,0.22));
-        border: 1.5px solid rgba(0,176,165,0.3);
+        background: linear-gradient(135deg, rgba(239,131,84,0.12), rgba(239,131,84,0.22));
+        border: 1.5px solid rgba(239,131,84,0.3);
         display: flex; align-items: center; justify-content: center;
         font-size: 32px;
       }
       .rvm-auth-title {
         font-size: 1.4rem; font-weight: 800;
-        color: #0d2b2b; letter-spacing: -0.03em;
+        color: #2D3142; letter-spacing: -0.03em;
       }
       .rvm-auth-sub {
-        font-size: 14px; font-weight: 300;
-        color: #5a8080; max-width: 320px; line-height: 1.7;
+        font-size: 14px; font-weight: 400;
+        color: #4F5D75; max-width: 320px; line-height: 1.7;
         margin-top: -8px;
       }
       .rvm-auth-note {
         padding: 14px 20px; border-radius: 12px;
-        background: rgba(0,176,165,0.06);
-        border: 1px solid rgba(0,176,165,0.18);
-        font-size: 12px; font-weight: 400; color: #3a6a6a;
+        background: rgba(239,131,84,0.06);
+        border: 1px solid rgba(239,131,84,0.18);
+        font-size: 12px; font-weight: 400; color: #4F5D75;
         line-height: 1.6; max-width: 380px;
       }
       .rvm-auth-note strong { font-weight: 700; color: #EF8354; }
@@ -41,15 +41,15 @@ const AuthGate = ({ onClose, t }) => (
         font-size: 13px; font-weight: 700;
         letter-spacing: 0.1em; text-transform: uppercase;
         text-decoration: none;
-        box-shadow: 0 6px 24px -4px rgba(0,176,165,0.45);
+        box-shadow: 0 6px 24px -4px rgba(239,131,84,0.45);
         transition: all 0.25s ease;
       }
       .rvm-login-btn:hover { background: #4F5D75; transform: translateY(-1px); }
       .rvm-signup-btn {
         display: inline-flex; align-items: center; gap: 8px;
         padding: 13px 24px; border-radius: 10px;
-        border: 1.5px solid rgba(0,176,165,0.3);
-        background: transparent; color: #3a5a5a;
+        border: 1.5px solid rgba(239,131,84,0.3);
+        background: transparent; color: #2D3142;
         font-size: 13px; font-weight: 700;
         letter-spacing: 0.1em; text-transform: uppercase;
         text-decoration: none;
@@ -98,7 +98,7 @@ const ReviewFormModal = ({ isOpen, isLoggedIn, reviewableTours, onClose, onSubmi
     <style>{`
       .rvm-backdrop {
         position: fixed; inset: 0; z-index: 100;
-        background: rgba(0,20,18,0.72);
+        background: rgba(15, 17, 23, 0.75);
         backdrop-filter: blur(6px);
         display: flex; align-items: center; justify-content: center;
         padding: 24px;
@@ -108,7 +108,7 @@ const ReviewFormModal = ({ isOpen, isLoggedIn, reviewableTours, onClose, onSubmi
         border-radius: 24px;
         max-width: 560px; width: 100%;
         max-height: 90vh; overflow-y: auto;
-        box-shadow: 0 40px 80px rgba(0,60,50,0.28);
+        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.35);
       }
 
       /* Header */
@@ -124,23 +124,23 @@ const ReviewFormModal = ({ isOpen, isLoggedIn, reviewableTours, onClose, onSubmi
       }
       .rvm-header-title {
         font-size: 1.35rem; font-weight: 800;
-        color: #0d2b2b; letter-spacing: -0.03em;
+        color: #2D3142; letter-spacing: -0.03em;
       }
       .rvm-close {
         width: 36px; height: 36px; border-radius: 50%;
-        background: rgba(0,176,165,0.08);
-        border: 1px solid rgba(0,176,165,0.2);
-        color: #3a5a5a; font-size: 16px; cursor: pointer;
+        background: rgba(239, 131, 84, 0.08);
+        border: 1px solid rgba(239, 131, 84, 0.2);
+        color: #2D3142; font-size: 16px; cursor: pointer;
         display: flex; align-items: center; justify-content: center;
         flex-shrink: 0;
         transition: all 0.2s ease;
       }
-      .rvm-close:hover { background: rgba(0,176,165,0.15); color: #0d2b2b; }
+      .rvm-close:hover { background: #EF8354; color: #fff; }
 
       /* Rule */
       .rvm-rule {
         height: 1px; margin: 20px 28px 0;
-        background: linear-gradient(90deg, rgba(0,176,165,0.2), transparent);
+        background: linear-gradient(90deg, rgba(239, 131, 84, 0.25), transparent);
       }
 
       /* Body */

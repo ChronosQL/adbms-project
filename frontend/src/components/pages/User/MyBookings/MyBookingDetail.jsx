@@ -1,7 +1,7 @@
 // components/pages/User/MyBookings/MyBookingDetail.jsx
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
-import { ArrowLeft, MapPin, Calendar, Users, Car, Phone, FileText, Clock, Baby, Briefcase, Check, X, Zap, AlertTriangle, Download } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Users, Car, Phone, FileText, Clock, Baby, Briefcase, Check, X, Zap, AlertTriangle, Download, MessageSquare } from "lucide-react";
 import { STATUS_STYLES, TOUR_TYPE_LABEL } from "./MyBookingCard";
 import { useBookings } from "../../../../context/BookingsContext.jsx";
 import BookingWeatherPanel from "./BookingWeatherPanel";
@@ -20,7 +20,7 @@ const DetailRow = ({ icon: Icon, label, value }) =>
       </div>
       <div>
         <p className="text-xs text-slate-400 font-medium">{label}</p>
-        <p className="text-sm font-semibold text-slate-800 mt-0.5">{value}</p>
+        <div className="text-sm font-semibold text-slate-800 mt-0.5">{value}</div>
       </div>
     </div>
   ) : null;
@@ -43,8 +43,8 @@ const MyBookingDetail = ({ booking, onBack }) => {
   const canCancel = ["ACCEPTED", "CONFIRMED"].includes(booking.status);
   const canDownloadPdf = currentStepIndex >= acceptedStepIndex;
   
-  const confirmedStepIndex = statusSteps.indexOf("CONFIRMED");
-  const showPaymentsButton = currentStepIndex >= confirmedStepIndex;
+  const tourStartedStepIndex = statusSteps.indexOf("TOUR_STARTED");
+  const showPaymentsButton = currentStepIndex >= tourStartedStepIndex;
 
   const handleDownloadPdf = async () => {
     try {
@@ -98,7 +98,7 @@ const MyBookingDetail = ({ booking, onBack }) => {
         {showPaymentsButton && (
           <button
             onClick={() => navigate('/user/profile', { state: { activeTab: 'payments', bookingId: booking.id } })}
-            className="ml-3 flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0d1720] text-white font-semibold text-sm hover:bg-[#0b1418] transition-all cursor-pointer"
+            className="ml-3 flex items-center gap-2 px-4 py-2 rounded-xl bg-[#EF8354] hover:bg-[#4F5D75] text-white font-semibold text-sm shadow-md shadow-[#EF8354]/20 transition-all cursor-pointer"
           >
             <Zap className="w-4 h-4" />
             <span>Payments</span>
@@ -139,6 +139,15 @@ const MyBookingDetail = ({ booking, onBack }) => {
               ❌ You rejected this quote. Feel free to submit a new booking.
             </p>
           )}
+          {booking.status === "COMPLETED" && (
+            <button
+              onClick={() => navigate("/reviews")}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[#2F9E44]/20 bg-[#2F9E44]/5 px-3 py-2 text-sm font-semibold text-[#2F9E44] transition-colors hover:bg-[#2F9E44]/10"
+            >
+              <MessageSquare className="h-4 w-4" />
+              You can add reviews now
+            </button>
+          )}
           {canDownloadPdf && (
             <button
               onClick={handleDownloadPdf}
@@ -154,7 +163,14 @@ const MyBookingDetail = ({ booking, onBack }) => {
         {booking.status === "QUOTED" && (
           <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-4">
             <p className="text-sm font-bold text-slate-800 mb-1">Price Quote Received!</p>
-            <p className="text-2xl font-bold text-[#EF8354] mb-1">${booking.quotedPrice}</p>
+            <p className="text-2xl font-bold text-[#EF8354] mb-1">
+              LKR {Number(booking.quotedPrice).toLocaleString('en-LK')}
+            </p>
+            {booking.tourType === "PACKAGE" && (
+              <p className="mb-3 rounded-xl border border-[#E3A857]/25 bg-[#E3A857]/10 px-3 py-2 text-xs leading-relaxed text-[#4F5D75]">
+                This price covers the vehicle only, not the whole trip. Additional tolls may apply along the way.
+              </p>
+            )}
 
             {booking.adminNote && (
               <div className="bg-white rounded-xl border border-blue-100 px-4 py-3 mb-3">
@@ -212,8 +228,10 @@ const MyBookingDetail = ({ booking, onBack }) => {
                 <p className="text-xs text-slate-500 font-mono">{booking.assignedVehicle.plateNumber} · {booking.assignedVehicle.type}</p>
               </div>
               <div className="ml-auto text-right">
-                <p className="text-xs text-slate-400">Price Paid</p>
-                <p className="text-lg font-extrabold text-[#EF8354]">${booking.quotedPrice}</p>
+                <p className="text-xs text-slate-400">Quoted Price</p>
+                <p className="text-lg font-extrabold text-[#EF8354]">
+                  LKR {Number(booking.quotedPrice).toLocaleString('en-LK')}
+                </p>
               </div>
             </div>
           </Section>
@@ -238,8 +256,38 @@ const MyBookingDetail = ({ booking, onBack }) => {
         <Section title="Trip Details">
           {booking.tourType === "P2P" && (
             <>
-              <DetailRow icon={MapPin} label="Pickup Location"   value={booking.startLocation || booking.pickupLocation} />
-              <DetailRow icon={MapPin} label="Drop-off Location" value={booking.endLocation || booking.dropoffLocation} />
+              <DetailRow
+                icon={MapPin}
+                label="Pickup Location"
+                value={
+                  booking.startLocation || booking.pickupLocation ? (
+                    <span className="flex items-center gap-2 flex-wrap">
+                      <span>{booking.startLocation || booking.pickupLocation}</span>
+                      {booking.pickupLat != null && booking.pickupLng != null && (
+                        <span className="text-[10px] font-medium bg-[#EF8354]/10 text-[#EF8354] px-2 py-0.5 rounded-full border border-[#EF8354]/20">
+                          GPS: {Number(booking.pickupLat).toFixed(4)}°, {Number(booking.pickupLng).toFixed(4)}°
+                        </span>
+                      )}
+                    </span>
+                  ) : null
+                }
+              />
+              <DetailRow
+                icon={MapPin}
+                label="Drop-off Location"
+                value={
+                  booking.endLocation || booking.dropoffLocation ? (
+                    <span className="flex items-center gap-2 flex-wrap">
+                      <span>{booking.endLocation || booking.dropoffLocation}</span>
+                      {booking.dropoffLat != null && booking.dropoffLng != null && (
+                        <span className="text-[10px] font-medium bg-[#EF8354]/10 text-[#EF8354] px-2 py-0.5 rounded-full border border-[#EF8354]/20">
+                          GPS: {Number(booking.dropoffLat).toFixed(4)}°, {Number(booking.dropoffLng).toFixed(4)}°
+                        </span>
+                      )}
+                    </span>
+                  ) : null
+                }
+              />
             </>
           )}
           <DetailRow icon={Calendar} label="Start Date"   value={booking.startDate} />

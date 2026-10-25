@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { CloudRain, Wind, Calendar, RefreshCw, AlertTriangle } from "lucide-react";
 import WeatherModal, { getWeatherInfo } from "./WeatherModal";
-import { loadLocationWeather } from "../../../../../services/weatherService";
+import { loadLocationWeather, fetchForecast } from "../../../../../services/weatherService";
 
 // ─── Component ────────────────────────────────────────────────────────────────
-const LocationWeather = ({ locationName }) => {
+const LocationWeather = ({ locationName, latitude, longitude }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [resolvedName, setResolvedName] = useState(null);
@@ -14,24 +14,36 @@ const LocationWeather = ({ locationName }) => {
 
   useEffect(() => {
     let active = true;
-    if (!locationName) {
-      setError("No location name provided.");
-      setLoading(false);
-      return;
-    }
-
     const load = async () => {
+      if (!locationName && (latitude == null || longitude == null)) {
+        if (active) {
+          setError("No location provided.");
+          setLoading(false);
+        }
+        return;
+      }
+
       setLoading(true);
       setError(null);
       setWeatherData(null);
       setResolvedName(null);
 
       try {
-        const { displayName, weatherData } = await loadLocationWeather(locationName);
+        let displayName = locationName;
+        let data = null;
+
+        if (latitude != null && longitude != null) {
+          data = await fetchForecast(latitude, longitude);
+          displayName = locationName ? `${locationName}, Sri Lanka` : "Sri Lanka";
+        } else {
+          const res = await loadLocationWeather(locationName);
+          displayName = res.displayName;
+          data = res.weatherData;
+        }
 
         if (active) {
           setResolvedName(displayName);
-          setWeatherData(weatherData);
+          setWeatherData(data);
           setLoading(false);
         }
       } catch (err) {
@@ -45,7 +57,7 @@ const LocationWeather = ({ locationName }) => {
 
     load();
     return () => { active = false; };
-  }, [locationName, refreshTrigger]);
+  }, [locationName, latitude, longitude, refreshTrigger]);
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
